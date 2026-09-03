@@ -167,7 +167,17 @@ function parseTextFiles(
   }
 }
 
-export function userConfigPaths(): { mcp: string[]; skillDirs: string[]; ruleDirs: string[] } {
+function isSkillContentFile(name: string): boolean {
+  const u = name.toUpperCase();
+  return u === "SKILL.MD" || u.endsWith(".MD") || /\.(JS|MJS|CJS|PY|SH|PS1|BASH)$/i.test(name);
+}
+
+export function userConfigPaths(): {
+  mcp: string[];
+  skillDirs: string[];
+  commandDirs: string[];
+  ruleDirs: string[];
+} {
   const home = os.homedir();
   const mcp: string[] = [
     path.join(home, ".cursor", "mcp.json"),
@@ -187,6 +197,7 @@ export function userConfigPaths(): { mcp: string[]; skillDirs: string[]; ruleDir
   return {
     mcp: [...new Set(mcp)],
     skillDirs: [path.join(home, ".cursor", "skills"), path.join(home, ".claude", "skills")],
+    commandDirs: [path.join(home, ".cursor", "commands"), path.join(home, ".claude", "commands")],
     ruleDirs: [path.join(home, ".cursor", "rules")],
   };
 }
@@ -210,19 +221,27 @@ export function inventoryWorkspaceRoot(workspaceRoot: string): InventoryItem[] {
     parseMcpFile(mcpWs, workspaceRoot, items);
   }
   const skillFiles: string[] = [];
-  walkFiles(path.join(workspaceRoot, ".cursor", "skills"), (n) => n.toUpperCase() === "SKILL.MD", skillFiles);
-  walkFiles(path.join(workspaceRoot, ".claude", "skills"), (n) => n.toUpperCase() === "SKILL.MD", skillFiles);
+  walkFiles(path.join(workspaceRoot, ".cursor", "skills"), isSkillContentFile, skillFiles);
+  walkFiles(path.join(workspaceRoot, ".claude", "skills"), isSkillContentFile, skillFiles);
+  walkFiles(path.join(workspaceRoot, ".cursor", "commands"), (n) => n.toUpperCase().endsWith(".MD"), skillFiles);
+  walkFiles(path.join(workspaceRoot, ".claude", "commands"), (n) => n.toUpperCase().endsWith(".MD"), skillFiles);
   parseTextFiles(skillFiles, "skill", workspaceRoot, items);
 
   const ruleFiles: string[] = [];
   walkFiles(path.join(workspaceRoot, ".cursor", "rules"), (n) => n.endsWith(".mdc") || n.endsWith(".md"), ruleFiles);
-  const agents = path.join(workspaceRoot, "AGENTS.md");
-  if (fs.existsSync(agents)) {
-    ruleFiles.push(agents);
+  for (const extra of ["AGENTS.md", "CLAUDE.md", "MEMORY.md", "SOUL.md", ".cursorrules"]) {
+    const p = path.join(workspaceRoot, extra);
+    if (fs.existsSync(p)) {
+      ruleFiles.push(p);
+    }
   }
-  const cursorrules = path.join(workspaceRoot, ".cursorrules");
-  if (fs.existsSync(cursorrules)) {
-    ruleFiles.push(cursorrules);
+  for (const settings of [
+    path.join(workspaceRoot, ".claude", "settings.json"),
+    path.join(workspaceRoot, ".claude", "settings.local.json"),
+  ]) {
+    if (fs.existsSync(settings)) {
+      ruleFiles.push(settings);
+    }
   }
   parseTextFiles(ruleFiles, "rule", workspaceRoot, items);
   return items;
@@ -238,7 +257,10 @@ export function inventoryUserConfig(): InventoryItem[] {
   }
   const skillFiles: string[] = [];
   for (const d of cfg.skillDirs) {
-    walkFiles(d, (n) => n.toUpperCase() === "SKILL.MD", skillFiles);
+    walkFiles(d, isSkillContentFile, skillFiles);
+  }
+  for (const d of cfg.commandDirs) {
+    walkFiles(d, (n) => n.toUpperCase().endsWith(".MD"), skillFiles);
   }
   parseTextFiles(skillFiles, "skill", undefined, items);
   const ruleFiles: string[] = [];

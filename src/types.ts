@@ -27,6 +27,7 @@ export interface Finding {
   version?: string;
   ecosystem?: Ecosystem;
   osvIds?: string[];
+  summary?: string;
   advisoryUrl?: string;
   acknowledged: boolean;
   workspaceRoot?: string;

@@ -1,4 +1,5 @@
 export const OSV_QUERYBATCH_URL = "https://api.osv.dev/v1/querybatch";
+export const OSV_VULN_URL = "https://api.osv.dev/v1/vulns";
 
 import type { Ecosystem, OsvQuery, OsvVuln } from "../types";
 
@@ -6,21 +7,28 @@ function osvEcosystem(eco: Ecosystem): string {
   return eco === "pypi" ? "PyPI" : "npm";
 }
 
+export function pickPrimaryOsvId(ids: string[]): string | undefined {
+  return ids.find((id) => id.startsWith("MAL-")) || ids.find((id) => id.startsWith("GHSA-")) || ids[0];
+}
+
 export function classifyOsvIds(vulns: OsvVuln[]): {
   severity: "critical" | "high" | "medium" | "low" | "info";
   ids: string[];
   advisoryUrl?: string;
+  malicious: boolean;
 } {
   const ids = vulns.map((v) => v.id).filter(Boolean);
+  const primary = pickPrimaryOsvId(ids);
   if (ids.some((id) => id.startsWith("MAL-"))) {
     return {
       severity: "critical",
       ids,
-      advisoryUrl: `https://osv.dev/vulnerability/${ids.find((id) => id.startsWith("MAL-"))}`,
+      malicious: true,
+      advisoryUrl: primary ? `https://osv.dev/vulnerability/${primary}` : undefined,
     };
   }
   if (ids.length === 0) {
-    return { severity: "info", ids };
+    return { severity: "info", ids, malicious: false };
   }
   const hasHigh = vulns.some((v) =>
     (v.severity || []).some((s) => {
@@ -28,12 +36,39 @@ export function classifyOsvIds(vulns: OsvVuln[]): {
       return Number.isFinite(n) && n >= 7;
     }),
   );
-  const first = ids[0];
   return {
     severity: hasHigh ? "high" : "medium",
     ids,
-    advisoryUrl: first ? `https://osv.dev/vulnerability/${first}` : undefined,
+    malicious: false,
+    advisoryUrl: primary ? `https://osv.dev/vulnerability/${primary}` : undefined,
   };
+}
+
+export async function fetchOsvSummaries(
+  ids: string[],
+  fetchImpl: typeof fetch = fetch,
+): Promise<Record<string, string>> {
+  const unique = [...new Set(ids.filter(Boolean))];
+  const out: Record<string, string> = {};
+  await Promise.all(
+    unique.map(async (id) => {
+      try {
+        const resp = await fetchImpl(`${OSV_VULN_URL}/${encodeURIComponent(id)}`, {
+          headers: { Accept: "application/json", "User-Agent": "chaintrap-agent-shield/0.1" },
+        });
+        if (!resp.ok) {
+          return;
+        }
+        const data = (await resp.json()) as { summary?: string };
+        if (data.summary?.trim()) {
+          out[id] = data.summary.trim();
+        }
+      } catch {
+        /* leave empty */
+      }
+    }),
+  );
+  return out;
 }
 
 export async function queryOsvQuerybatch(

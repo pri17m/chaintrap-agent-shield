@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import type { Finding } from "../types";
+import { findingTreeCommand, shortPath } from "./findingCopy";
 
 export class AgentActivityProvider implements vscode.TreeDataProvider<FindingItem | GroupItem> {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<FindingItem | GroupItem | undefined>();
@@ -44,21 +45,9 @@ class GroupItem extends vscode.TreeItem {
 class FindingItem extends vscode.TreeItem {
   constructor(finding: Finding) {
     super(`[${finding.severity}] ${finding.title}`, vscode.TreeItemCollapsibleState.None);
-    this.description = finding.source;
+    this.description = `${finding.source} · ${shortPath(finding.path)}`;
     this.tooltip = finding.message;
     this.resourceUri = vscode.Uri.file(finding.path);
-    if (finding.advisoryUrl) {
-      this.command = {
-        command: "vscode.open",
-        title: "Open advisory",
-        arguments: [vscode.Uri.parse(finding.advisoryUrl)],
-      };
-    } else {
-      this.command = {
-        command: "vscode.open",
-        title: "Open file",
-        arguments: [vscode.Uri.file(finding.path)],
-      };
-    }
+    this.command = findingTreeCommand(finding);
   }
 }

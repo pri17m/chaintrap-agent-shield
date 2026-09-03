@@ -14,3 +14,7 @@ scripts/**
 fixtures/**
 DOGFOOD.md
 media/screenshots/*.html
+.code-review-graph/**
+.gitnexus/**
+**/*.db
+**/*.db-*
