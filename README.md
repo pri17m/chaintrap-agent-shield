@@ -1,6 +1,6 @@
 # Chaintrap Agent Shield
 
-> **See what your AI coding agent installed.** Baseline-scan the repos you have open, then warn when new packages, MCP servers, skills, or rules look malicious or vulnerable.
+> **See what your AI coding agent installed.** Baseline-scan the repos you have open, then warn when new npm/PyPI packages or MCP-inferred dependencies look malicious or vulnerable.
 
 VS Code / Cursor extension for individual developers. **Publisher:** `pri17m`.
 
@@ -8,7 +8,7 @@ VS Code / Cursor extension for individual developers. **Publisher:** `pri17m`.
 
 Agentic tools (Cursor, Claude Code, Copilot Chat) can add npm/PyPI packages, MCP servers, and skills without a human noticing. This extension:
 
-1. **Phase A — Baseline.** On workspace open, inventories every open folder plus user `.cursor` / MCP config. Analyzes **all** packages via [OSV](https://osv.dev) and a bundled known-bad list, and heuristics on skills/rules. Flags threats that were already installed.
+1. **Phase A — Baseline.** On workspace open, inventories every open folder plus user `.cursor` / MCP config. Analyzes **all** packages (and MCP-inferred packages) via [OSV](https://osv.dev) and a bundled known-bad list. Skill/rule files are inventoried only — heuristics are disabled (false positives). Flags package threats that were already installed.
 2. **Phase B — Diff.** Watches the same files. Analyzes **only new/changed** items and warns.
 3. **Warn + ack.** Malware (`MAL-*` or known-bad) requires “I understand the risk.” CVEs show in Problems.
 
@@ -16,7 +16,7 @@ No Chaintrap API key is required for package/MCP checks. OSV is public.
 
 ## 60-second setup
 
-1. Install from [GitHub Releases](https://github.com/pri17m/chaintrap-agent-shield/releases) (`code --install-extension chaintrap-agent-shield-0.1.4.vsix`), or from the Marketplace (`pri17m.chaintrap-agent-shield`) once `vsce publish` succeeds for publisher `pri17m`.
+1. Install from [GitHub Releases](https://github.com/pri17m/chaintrap-agent-shield/releases) (`code --install-extension chaintrap-agent-shield-0.1.6.vsix`), or from the Marketplace (`pri17m.chaintrap-agent-shield`) once `vsce publish` succeeds for publisher `pri17m`.
 2. Open a folder. Status bar: `Chaintrap: scanning workspace…` then `baseline complete`.
 3. Open the **Chaintrap** activity bar for baseline vs delta findings.
 
@@ -24,7 +24,7 @@ No Chaintrap API key is required for package/MCP checks. OSV is public.
 
 ![Agent Activity tree with a suspicious skill finding and acknowledgment modal](media/screenshots/agent-activity-ack.png)
 
-*Agent Activity — baseline/delta findings plus the “I understand the risk” ack modal for a suspicious skill.*
+*Agent Activity — baseline/delta findings plus the “I understand the risk” ack modal.*
 
 ![Agent Activity tree with baseline vs delta findings](media/screenshots/activity.png)
 
@@ -38,8 +38,8 @@ No Chaintrap API key is required for package/MCP checks. OSV is public.
 |---------|--------|
 | Dependencies | `package.json`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `requirements.txt` (`uv.lock` watched, parse deferred) |
 | MCP | workspace `.cursor/mcp.json`, `~/.cursor/mcp.json`, VS Code User `mcp.json` |
-| Skills | `.cursor/skills/**/SKILL.md`, `.claude/skills/**/SKILL.md` |
-| Rules | `.cursor/rules/**`, `AGENTS.md`, `.cursorrules` |
+| Skills | Inventoried only (heuristics off): `.cursor/skills/**/SKILL.md`, `.claude/skills/**/SKILL.md` |
+| Rules | Inventoried only (heuristics off): `.cursor/rules/**`, `AGENTS.md`, `.cursorrules` |
 
 ## Commands
 

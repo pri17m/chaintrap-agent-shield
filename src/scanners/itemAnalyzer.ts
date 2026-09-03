@@ -1,6 +1,4 @@
-import * as fs from "fs";
 import type { Finding, FindingSource, InventoryItem } from "../types";
-import { analyzeSkillOrRule } from "./skillHeuristics";
 import { analyzePackages, type PackageToAnalyze } from "./packageAnalyzer";
 
 export function packagesFromItems(items: InventoryItem[]): PackageToAnalyze[] {
@@ -35,6 +33,10 @@ export interface AnalyzeItemsOptions {
   skipKeys?: Set<string>;
 }
 
+/**
+ * Skill/rule heuristics are disabled (false positives). Inventory still records
+ * those files; only npm/PyPI packages and MCP-inferred packages produce findings.
+ */
 export async function analyzeItems(
   items: InventoryItem[],
   source: FindingSource,
@@ -43,36 +45,5 @@ export async function analyzeItems(
 ): Promise<Finding[]> {
   const skip = options?.skipKeys;
   const toAnalyze = skip ? items.filter((i) => !skip.has(i.key)) : items;
-  const findings = await analyzePackages(packagesFromItems(toAnalyze), source, fetchImpl);
-  const now = new Date().toISOString();
-  for (const item of toAnalyze) {
-    if (item.kind !== "skill" && item.kind !== "rule") {
-      continue;
-    }
-    let content = item.content;
-    if (content === undefined) {
-      try {
-        content = fs.readFileSync(item.path, "utf8");
-      } catch {
-        continue;
-      }
-    }
-    const hits = analyzeSkillOrRule(content, item.path);
-    for (const hit of hits) {
-      findings.push({
-        id: `${source}:${item.kind}:${item.path}:${hit.title}`,
-        source,
-        surface: item.kind,
-        severity: hit.severity,
-        title: hit.title,
-        message: `Description: ${hit.message}`,
-        summary: hit.message,
-        path: item.path,
-        acknowledged: false,
-        workspaceRoot: item.workspaceRoot,
-        createdAt: now,
-      });
-    }
-  }
-  return findings;
+  return analyzePackages(packagesFromItems(toAnalyze), source, fetchImpl);
 }

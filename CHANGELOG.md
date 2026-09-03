@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.6
+
+- Disable skill/rule heuristic findings (false positives). Inventory still records skills/rules; only npm/PyPI and MCP-inferred packages are flagged
+- Marketplace-ready follow-up to 0.1.5 finding-trust hardening
+
 ## 0.1.5
 
 - API key moves to VS Code SecretStorage (Set/Clear commands); plaintext setting deprecated + one-time migrate

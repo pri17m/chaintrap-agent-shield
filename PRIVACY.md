@@ -18,7 +18,7 @@ Only these surfaces are inventoried (workspace roots you have open, plus user ag
 
 - MCP configs (workspace `.cursor/mcp.json`, `~/.cursor/mcp.json`, VS Code / Cursor User `mcp.json`)
 
-- Skill and rule files (`.cursor/skills`, `.claude/skills`, commands, `.cursor/rules`, `AGENTS.md`, `CLAUDE.md`, `MEMORY.md`, `SOUL.md`, `.cursorrules`, Claude settings JSON)
+- Skill and rule files (inventoried only; not heuristically flagged): `.cursor/skills`, `.claude/skills`, commands, `.cursor/rules`, `AGENTS.md`, `CLAUDE.md`, `MEMORY.md`, `SOUL.md`, `.cursorrules`, Claude settings JSON
 
 
 
@@ -30,7 +30,7 @@ The extension does not execute workspace code. It does not upload source files.
 
 
 
-**Default (required for online package checks):** package **name**, **version**, and ecosystem (`npm` or `PyPI`) to `https://api.osv.dev/v1/querybatch`, and when an advisory is shown, `https://api.osv.dev/v1/vulns/{id}` for the OSV **summary**. Skill and rule **contents never leave the machine**.
+**Default (required for online package checks):** package **name**, **version**, and ecosystem (`npm` or `PyPI`) to `https://api.osv.dev/v1/querybatch`, and when an advisory is shown, `https://api.osv.dev/v1/vulns/{id}` for the OSV **summary**. Skill and rule **contents never leave the machine** and are not analyzed for findings in 0.1.6.
 
 
 
