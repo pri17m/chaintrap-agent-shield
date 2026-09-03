@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.4
+
+- Scan efficiency: single-pass inventory, reuse skill/rule content in-memory, skip re-analysis when item hash matches prior baseline
+- Soft caps for oversized skill files (256 KiB) and tree walks (400 files)
+- Watchers aligned with inventory (commands, Claude settings, agent memory files); leaner debounce
+- VSIX excludes Spec Kit scaffolding (`.specify`, `specs`, `.cursor`), graphs, and DBs
+- Spec Kit (constitution + `specs/001-scan-efficiency`) for future agent-driven iteration
+
 ## 0.1.3
 
 - Activity-bar badge shows unacknowledged high/critical finding count (SCM-style)

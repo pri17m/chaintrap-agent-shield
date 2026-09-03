@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import type { BaselineSnapshot, Finding, InventoryItem } from "../types";
+import { persistableItem } from "../scanners/inventory";
 
 const BASELINE_KEY = "chaintrap.baselines.v1";
 const FINDINGS_KEY = "chaintrap.findings.v1";
@@ -52,7 +53,7 @@ export class StateStore {
   snapshotFromItems(workspaceRoot: string, items: InventoryItem[]): BaselineSnapshot {
     const map: Record<string, InventoryItem> = {};
     for (const item of items) {
-      map[item.key] = item;
+      map[item.key] = persistableItem(item);
     }
     return { workspaceRoot, scannedAt: new Date().toISOString(), items: map };
   }

@@ -2,9 +2,7 @@ import * as vscode from "vscode";
 import * as os from "os";
 import * as path from "path";
 
-export function createWatchers(
-  onChange: () => void,
-): vscode.Disposable {
+export function createWatchers(onChange: () => void): vscode.Disposable {
   const watchers: vscode.FileSystemWatcher[] = [];
   const globs = [
     "**/package.json",
@@ -14,10 +12,17 @@ export function createWatchers(
     "**/uv.lock",
     "**/requirements.txt",
     "**/.cursor/mcp.json",
-    "**/.cursor/skills/**/SKILL.md",
+    "**/.cursor/skills/**",
+    "**/.cursor/commands/**",
     "**/.cursor/rules/**",
-    "**/.claude/skills/**/SKILL.md",
+    "**/.claude/skills/**",
+    "**/.claude/commands/**",
+    "**/.claude/settings.json",
+    "**/.claude/settings.local.json",
     "**/AGENTS.md",
+    "**/CLAUDE.md",
+    "**/MEMORY.md",
+    "**/SOUL.md",
     "**/.cursorrules",
   ];
   for (const g of globs) {
@@ -27,14 +32,20 @@ export function createWatchers(
     w.onDidDelete(onChange);
     watchers.push(w);
   }
-  const homeGlobs = [
-    path.join(os.homedir(), ".cursor", "mcp.json"),
-    path.join(os.homedir(), ".cursor", "skills", "**", "SKILL.md"),
+  const home = os.homedir();
+  const homeWatchRoots: Array<{ dir: string; pattern: string }> = [
+    { dir: path.join(home, ".cursor"), pattern: "mcp.json" },
+    { dir: path.join(home, ".cursor", "skills"), pattern: "**/*" },
+    { dir: path.join(home, ".cursor", "commands"), pattern: "**/*" },
+    { dir: path.join(home, ".cursor", "rules"), pattern: "**/*" },
+    { dir: path.join(home, ".claude", "skills"), pattern: "**/*" },
+    { dir: path.join(home, ".claude", "commands"), pattern: "**/*" },
   ];
-  for (const abs of homeGlobs) {
-    const w = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(path.dirname(abs), path.basename(abs)));
+  for (const { dir, pattern } of homeWatchRoots) {
+    const w = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(dir, pattern));
     w.onDidChange(onChange);
     w.onDidCreate(onChange);
+    w.onDidDelete(onChange);
     watchers.push(w);
   }
   return vscode.Disposable.from(...watchers);

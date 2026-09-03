@@ -13,6 +13,8 @@ export interface InventoryItem {
   version?: string;
   ecosystem?: Ecosystem;
   mcpId?: string;
+  /** Ephemeral UTF-8 body for the current scan pass — never persist. */
+  content?: string;
 }
 
 export interface Finding {

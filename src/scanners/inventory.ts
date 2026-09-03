@@ -5,6 +5,11 @@ import * as path from "path";
 import type { InventoryItem } from "../types";
 import { inferredFromMcpServer, parseMcpConfigJson } from "./mcpParser";
 
+/** Skip loading skill/rule bodies larger than this (bytes). */
+export const MAX_SKILL_FILE_BYTES = 256 * 1024;
+/** Soft cap on files collected per tree walk root. */
+export const MAX_FILES_PER_TREE = 400;
+
 function sha256(s: string): string {
   return crypto.createHash("sha256").update(s).digest("hex");
 }
@@ -17,8 +22,20 @@ function readText(p: string): string | null {
   }
 }
 
-function walkFiles(dir: string, matcher: (name: string) => boolean, acc: string[], depth = 0): void {
-  if (depth > 6) {
+/** Drop ephemeral fields before persisting baselines. */
+export function persistableItem(item: InventoryItem): InventoryItem {
+  const { content: _content, ...rest } = item;
+  return rest;
+}
+
+function walkFiles(
+  dir: string,
+  matcher: (name: string) => boolean,
+  acc: string[],
+  depth = 0,
+  maxFiles = MAX_FILES_PER_TREE,
+): void {
+  if (depth > 6 || acc.length >= maxFiles) {
     return;
   }
   let entries: fs.Dirent[];
@@ -28,12 +45,15 @@ function walkFiles(dir: string, matcher: (name: string) => boolean, acc: string[
     return;
   }
   for (const e of entries) {
+    if (acc.length >= maxFiles) {
+      return;
+    }
     const full = path.join(dir, e.name);
     if (e.isDirectory()) {
       if (e.name === "node_modules" || e.name === ".git") {
         continue;
       }
-      walkFiles(full, matcher, acc, depth + 1);
+      walkFiles(full, matcher, acc, depth + 1, maxFiles);
     } else if (e.isFile() && matcher(e.name)) {
       acc.push(full);
     }
@@ -156,13 +176,36 @@ function parseTextFiles(
   items: InventoryItem[],
 ): void {
   for (const filePath of files) {
-    const raw = readText(filePath) || "";
+    let size = 0;
+    let mtimeMs = 0;
+    try {
+      const st = fs.statSync(filePath);
+      size = st.size;
+      mtimeMs = st.mtimeMs;
+    } catch {
+      continue;
+    }
+    if (size > MAX_SKILL_FILE_BYTES) {
+      items.push({
+        key: `${kind}:${filePath}`,
+        kind,
+        path: filePath,
+        hash: sha256(`oversized:${size}:${mtimeMs}:${filePath}`),
+        workspaceRoot,
+      });
+      continue;
+    }
+    const raw = readText(filePath);
+    if (raw === null) {
+      continue;
+    }
     items.push({
       key: `${kind}:${filePath}`,
       kind,
       path: filePath,
       hash: sha256(raw),
       workspaceRoot,
+      content: raw,
     });
   }
 }

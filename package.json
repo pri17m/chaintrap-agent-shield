@@ -2,7 +2,7 @@
   "name": "chaintrap-agent-shield",
   "displayName": "Chaintrap Agent Shield",
   "description": "EDR-style visibility for AI coding agents: baseline-scan workspace packages, MCP servers, skills, and rules; warn on malicious or vulnerable installs.",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "publisher": "pri17m",
   "license": "MIT",
   "icon": "media/icon.png",

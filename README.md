@@ -74,6 +74,15 @@ npm run compile
 
 Press F5 in VS Code to launch the Extension Development Host, then open `fixtures/dogfood` (known-bad `nx` + MCP package + suspicious skill). See [DOGFOOD.md](DOGFOOD.md).
 
+### Spec Kit (Cursor)
+
+This repo is initialized with [GitHub Spec Kit](https://github.com/github/spec-kit) for Cursor (`specify init --integration cursor-agent`). Skills live under `.cursor/skills/speckit-*`. In Cursor Agent chat:
+
+1. `/speckit-constitution` — project principles (see `.specify/memory/constitution.md`)
+2. `/speckit-specify` → `/speckit-plan` → `/speckit-tasks` → `/speckit-implement` → `/speckit-converge`
+
+Active efficiency feature: `specs/001-scan-efficiency/`. CLI: `uv tool install specify-cli` then `specify` on PATH (`%USERPROFILE%\.local\bin`).
+
 Sync known-bad intel from a sibling checkout:
 
 ```bash

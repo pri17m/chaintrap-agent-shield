@@ -30,22 +30,32 @@ export function packagesFromItems(items: InventoryItem[]): PackageToAnalyze[] {
   return out;
 }
 
+export interface AnalyzeItemsOptions {
+  /** Inventory keys whose hash is unchanged vs prior baseline — skip re-analysis. */
+  skipKeys?: Set<string>;
+}
+
 export async function analyzeItems(
   items: InventoryItem[],
   source: FindingSource,
   fetchImpl?: typeof fetch,
+  options?: AnalyzeItemsOptions,
 ): Promise<Finding[]> {
-  const findings = await analyzePackages(packagesFromItems(items), source, fetchImpl);
+  const skip = options?.skipKeys;
+  const toAnalyze = skip ? items.filter((i) => !skip.has(i.key)) : items;
+  const findings = await analyzePackages(packagesFromItems(toAnalyze), source, fetchImpl);
   const now = new Date().toISOString();
-  for (const item of items) {
+  for (const item of toAnalyze) {
     if (item.kind !== "skill" && item.kind !== "rule") {
       continue;
     }
-    let content = "";
-    try {
-      content = fs.readFileSync(item.path, "utf8");
-    } catch {
-      continue;
+    let content = item.content;
+    if (content === undefined) {
+      try {
+        content = fs.readFileSync(item.path, "utf8");
+      } catch {
+        continue;
+      }
     }
     const hits = analyzeSkillOrRule(content, item.path);
     for (const hit of hits) {

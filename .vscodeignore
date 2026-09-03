@@ -16,5 +16,8 @@ DOGFOOD.md
 media/screenshots/*.html
 .code-review-graph/**
 .gitnexus/**
+.specify/**
+specs/**
+.cursor/**
 **/*.db
 **/*.db-*
