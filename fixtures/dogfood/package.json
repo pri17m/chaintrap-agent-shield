@@ -1,0 +1,8 @@
+{
+  "name": "chaintrap-dogfood",
+  "private": true,
+  "description": "Local dogfood workspace for Chaintrap Agent Shield Phase A/B.",
+  "dependencies": {
+    "nx": "20.9.0"
+  }
+}

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Chaintrap MCP diff</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 1280px; height: 800px; overflow: hidden;
+      font-family: "Segoe UI", sans-serif; background: #0b1220; color: #e8eef7;
+    }
+    .wrap { display: grid; grid-template-columns: 1fr 1fr; height: 800px; }
+    .pane { padding: 28px; }
+    .left { background: #0e1624; border-right: 1px solid #22344d; }
+    h2 { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #14b8a6; margin-bottom: 14px; }
+    pre {
+      font-family: "Cascadia Mono", Consolas, monospace; font-size: 13px; line-height: 1.55;
+      background: #0a101a; border: 1px solid #1c2a40; border-radius: 8px; padding: 16px; color: #d6e2f0;
+    }
+    .add { background: #052e1a; color: #86efac; }
+    .right { padding: 36px; }
+    .chip { display: inline-block; background: #3f1518; color: #fca5a5; padding: 4px 10px; border-radius: 999px; font-size: 12px; margin-bottom: 12px; }
+    h1 { font-size: 22px; margin-bottom: 10px; line-height: 1.25; }
+    p { color: #9fb3c8; line-height: 1.5; max-width: 46ch; }
+    ul { margin-top: 22px; color: #c5d0de; line-height: 1.7; padding-left: 18px; }
+    li strong { color: #5eead4; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="pane left">
+      <h2>.cursor/mcp.json · delta</h2>
+      <pre>{
+  "mcpServers": {
+    "docs": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp"]
+    },
+<span class="add">    "postman": {
+      "command": "npx",
+      "args": ["-y", "@postman/postman-mcp-cli@1.0.4"]
+    }</span>
+  }
+}</pre>
+    </div>
+    <div class="pane right">
+      <div class="chip">source: delta · severity: critical</div>
+      <h1>Inferred MCP npm package</h1>
+      <p>Chaintrap parsed the MCP command, extracted <em>@postman/postman-mcp-cli@1.0.4</em>, matched the bundled known-bad list, and opened the acknowledgment modal.</p>
+      <ul>
+        <li><strong>Offline:</strong> known-bad denylist hit</li>
+        <li><strong>Online:</strong> OSV querybatch for MAL-* / CVE</li>
+        <li><strong>Privacy:</strong> package name + version only</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Chaintrap Agent Activity</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 1280px; height: 800px; overflow: hidden;
+      font-family: "Segoe UI", "IBM Plex Sans", sans-serif;
+      background: #0b1220; color: #e8eef7;
+    }
+    .app { display: grid; grid-template-columns: 52px 280px 1fr; height: 800px; }
+    .bar { background: #07101c; border-right: 1px solid #1c2a40; display: flex; flex-direction: column; align-items: center; padding-top: 14px; gap: 18px; }
+    .bar .icon { width: 28px; height: 28px; border-radius: 6px; }
+    .bar .active { outline: 2px solid #14b8a6; outline-offset: 3px; }
+    .side { background: #0e1726; border-right: 1px solid #1c2a40; padding: 16px 14px; }
+    .brand { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #14b8a6; margin-bottom: 18px; }
+    .group { font-size: 12px; color: #8aa0b8; margin: 16px 0 8px; }
+    .row { display: flex; gap: 8px; align-items: flex-start; padding: 8px; border-radius: 6px; }
+    .row.crit { background: #3f1518; }
+    .sev { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
+    .crit .sev { background: #ef4444; color: #fff; }
+    .high .sev { background: #f59e0b; color: #111; }
+    .title { font-size: 13px; line-height: 1.35; }
+    .meta { font-size: 11px; color: #7d93ab; }
+    .main { padding: 28px 36px; }
+    .status { display: inline-flex; gap: 8px; align-items: center; background: #122033; border: 1px solid #1f3a4d; color: #5eead4; padding: 6px 12px; border-radius: 999px; font-size: 12px; }
+    h1 { font-size: 28px; margin: 18px 0 8px; font-weight: 650; }
+    p { color: #9fb3c8; max-width: 62ch; line-height: 1.5; }
+    .problems { margin-top: 28px; background: #101a2b; border: 1px solid #22344d; border-radius: 10px; overflow: hidden; }
+    .ph { padding: 10px 14px; background: #132033; font-size: 12px; color: #8aa0b8; }
+    .pl { padding: 12px 14px; border-top: 1px solid #1c2a40; font-family: "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+    .pl span { color: #f87171; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="bar">
+      <div class="icon" style="background:#3b82f6"></div>
+      <div class="icon" style="background:#64748b"></div>
+      <div class="icon active" style="background:#14b8a6"></div>
+    </div>
+    <aside class="side">
+      <div class="brand">Chaintrap · Agent Activity</div>
+      <div class="group">Baseline (already installed)</div>
+      <div class="row crit">
+        <span class="sev">CRIT</span>
+        <div>
+          <div class="title">known-bad npm nx@20.9.0</div>
+          <div class="meta">package-lock.json · baseline</div>
+        </div>
+      </div>
+      <div class="row high">
+        <span class="sev">HIGH</span>
+        <div>
+          <div class="title">CVE in lodash@4.17.20</div>
+          <div class="meta">package.json · baseline</div>
+        </div>
+      </div>
+      <div class="group">Delta (agent changes)</div>
+      <div class="row crit">
+        <span class="sev">CRIT</span>
+        <div>
+          <div class="title">MCP inferred @postman/postman-mcp-cli@1.0.4</div>
+          <div class="meta">.cursor/mcp.json · delta</div>
+        </div>
+      </div>
+    </aside>
+    <main class="main">
+      <div class="status">Chaintrap: 2 critical</div>
+      <h1>See what the agent installed</h1>
+      <p>Baseline findings were already in this workspace. Delta findings appeared after the last scan — typically an AI agent editing lockfiles, MCP, skills, or rules.</p>
+      <div class="problems">
+        <div class="ph">Problems · chaintrap</div>
+        <div class="pl"><span>MALWARE</span> known-bad package nx@20.9.0 — s1ngularity campaign</div>
+        <div class="pl"><span>MALWARE</span> MCP package @postman/postman-mcp-cli@1.0.4</div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

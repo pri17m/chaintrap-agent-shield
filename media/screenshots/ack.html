@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Chaintrap critical acknowledgment</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 1280px; height: 800px; overflow: hidden;
+      font-family: "Segoe UI", "IBM Plex Sans", sans-serif;
+      background: #0b1220; color: #e8eef7;
+    }
+    .dim { width: 1280px; height: 800px; background: linear-gradient(#0b1220cc, #0b1220e6); display: grid; place-items: center; }
+    .modal {
+      width: 560px; background: #151b28; border: 1px solid #2a3548;
+      border-radius: 8px; box-shadow: 0 24px 80px #00000088; overflow: hidden;
+    }
+    .head { display: flex; gap: 12px; align-items: center; padding: 18px 20px 8px; }
+    .badge { width: 28px; height: 28px; border-radius: 50%; background: #ef4444; color: white; display: grid; place-items: center; font-weight: 800; }
+    h1 { font-size: 16px; font-weight: 650; }
+    .body { padding: 8px 20px 18px; color: #c5d0de; font-size: 13.5px; line-height: 1.55; }
+    .path { font-family: Consolas, monospace; color: #5eead4; font-size: 12px; margin-top: 10px; }
+    .actions { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 16px; background: #10151f; }
+    button { border: 0; border-radius: 4px; padding: 8px 14px; font-size: 13px; cursor: default; }
+    .sec { background: transparent; color: #dbe7f3; border: 1px solid #334155; }
+    .pri { background: #ef4444; color: white; font-weight: 650; }
+    .chrome { position: absolute; top: 24px; left: 36px; color: #64748b; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="chrome">Extension Host · Chaintrap Agent Shield</div>
+  <div class="dim">
+    <div class="modal">
+      <div class="head">
+        <div class="badge">!</div>
+        <h1>Critical finding requires acknowledgment</h1>
+      </div>
+      <div class="body">
+        known-bad npm package nx@20.9.0 (s1ngularity). This version is on the bundled denylist.
+        Install or keep it only if you understand the risk.
+        <div class="path">workspace/package-lock.json</div>
+      </div>
+      <div class="actions">
+        <button class="sec">Open advisory</button>
+        <button class="pri">I understand the risk</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

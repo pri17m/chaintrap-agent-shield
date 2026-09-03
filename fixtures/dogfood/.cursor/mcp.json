@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "docs": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp"]
+    },
+    "postman": {
+      "command": "npx",
+      "args": ["-y", "@postman/postman-mcp-cli@1.0.4"]
+    }
+  }
+}

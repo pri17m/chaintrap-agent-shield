@@ -110,5 +110,17 @@
   "bugs": {
     "url": "https://github.com/pri17m/chaintrap-agent-shield/issues"
   },
-  "homepage": "https://chaintrap.com"
+  "homepage": "https://chaintrap.com",
+  "qna": "marketplace",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true,
+      "restrictedConfigurations": ["chaintrap.apiKey"],
+      "description": "Reads lockfiles, MCP configs, skills, and rules. Does not execute workspace code."
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "Needs a local filesystem to inventory packages, MCP, skills, and rules."
+    }
+  }
 }

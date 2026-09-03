@@ -16,9 +16,17 @@ No Chaintrap API key is required for package/MCP checks. OSV is public.
 
 ## 60-second setup
 
-1. Install **Chaintrap Agent Shield** from the Marketplace (`pri17m.chaintrap-agent-shield`).
+1. Install from [GitHub Releases](https://github.com/pri17m/chaintrap-agent-shield/releases) (`code --install-extension chaintrap-agent-shield-0.1.0.vsix`), or from the Marketplace (`pri17m.chaintrap-agent-shield`) once `vsce publish` succeeds for publisher `pri17m`.
 2. Open a folder. Status bar: `Chaintrap: scanning workspace…` then `baseline complete`.
 3. Open the **Chaintrap** activity bar for baseline vs delta findings.
+
+## Screenshots
+
+![Agent Activity tree with baseline vs delta findings](media/screenshots/activity.png)
+
+![Critical finding acknowledgment modal](media/screenshots/ack.png)
+
+![MCP config diff with inferred malicious package](media/screenshots/mcp.png)
 
 ## What is watched
 
@@ -43,7 +51,9 @@ No Chaintrap API key is required for package/MCP checks. OSV is public.
 - Source code is not uploaded.
 - Optional Chaintrap deep extension scans send only the VS Code extension id to `scan.chaintrap.com` when you set `chaintrap.apiKey`.
 
-Privacy policy: [https://chaintrap.com](https://chaintrap.com)
+Permissions: the extension only watches the globs listed above (plus user-level Cursor MCP/skills). It does not request a broad `*` filesystem permission beyond those paths.
+
+Full policy: [PRIVACY.md](PRIVACY.md) · [https://chaintrap.com](https://chaintrap.com)
 
 ## Settings
 
@@ -62,7 +72,7 @@ npm test
 npm run compile
 ```
 
-Press F5 in VS Code to launch the Extension Development Host.
+Press F5 in VS Code to launch the Extension Development Host, then open `fixtures/dogfood` (known-bad `nx` + MCP package + suspicious skill). See [DOGFOOD.md](DOGFOOD.md).
 
 Sync known-bad intel from a sibling checkout:
 
@@ -78,10 +88,14 @@ npm run package
 
 Publish (requires Marketplace PAT for publisher `pri17m`):
 
+Create a Classic Azure DevOps PAT with **Marketplace (Acquire, Publish)** for publisher `pri17m` (https://marketplace.visualstudio.com/manage), then:
+
 ```bash
 npx @vscode/vsce login pri17m
 npx @vscode/vsce publish
 ```
+
+A publish attempt without that PAT fails with TF400813. The packaged VSIX is also attached to GitHub Releases for dogfood.
 
 ## License
 

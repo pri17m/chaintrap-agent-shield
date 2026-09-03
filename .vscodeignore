@@ -9,3 +9,8 @@ node_modules/**
 out/test/**
 scripts/**
 .git/**
+.github/**
+*.vsix
+fixtures/**
+DOGFOOD.md
+media/screenshots/*.html
