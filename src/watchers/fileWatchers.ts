@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
-import * as os from "os";
-import * as path from "path";
+import { homeWatchRoots } from "./homeWatchRoots";
+
+export type { HomeWatchRoot } from "./homeWatchRoots";
+export { homeWatchRoots };
 
 export function createWatchers(onChange: () => void): vscode.Disposable {
   const watchers: vscode.FileSystemWatcher[] = [];
@@ -32,16 +34,7 @@ export function createWatchers(onChange: () => void): vscode.Disposable {
     w.onDidDelete(onChange);
     watchers.push(w);
   }
-  const home = os.homedir();
-  const homeWatchRoots: Array<{ dir: string; pattern: string }> = [
-    { dir: path.join(home, ".cursor"), pattern: "mcp.json" },
-    { dir: path.join(home, ".cursor", "skills"), pattern: "**/*" },
-    { dir: path.join(home, ".cursor", "commands"), pattern: "**/*" },
-    { dir: path.join(home, ".cursor", "rules"), pattern: "**/*" },
-    { dir: path.join(home, ".claude", "skills"), pattern: "**/*" },
-    { dir: path.join(home, ".claude", "commands"), pattern: "**/*" },
-  ];
-  for (const { dir, pattern } of homeWatchRoots) {
+  for (const { dir, pattern } of homeWatchRoots()) {
     const w = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(dir, pattern));
     w.onDidChange(onChange);
     w.onDidCreate(onChange);

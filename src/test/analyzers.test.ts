@@ -11,10 +11,15 @@ import { analyzeItems } from "../scanners/itemAnalyzer";
 import {
   inventoryWorkspaceRoot,
   MAX_SKILL_FILE_BYTES,
+  parsePnpmPackageKey,
+  parseYarnLockBody,
   persistableItem,
 } from "../scanners/inventory";
+import { ApiKeyStore } from "../store/apiKeyStore";
 import { diffItems } from "../store/diffEngine";
-import { formatAckBody, needsAckPopup, countUnackedHighCritical, findingTreeCommand } from "../ui/findingCopy";
+import { formatAckBody, needsAckPopup, countUnackedHighCritical, findingTreeCommand, statusBarText } from "../ui/findingCopy";
+import { applyDeltaFindings, replaceBaselineFindings, scopeFindingsForDisplay } from "../ui/findingMerge";
+import { homeWatchRoots } from "../watchers/homeWatchRoots";
 import type { Finding, InventoryItem } from "../types";
 
 suite("osvClient", () => {
@@ -445,5 +450,157 @@ suite("chaintrapClient", () => {
     const done = await client.pollJob("j1", { timeoutMs: 1000, intervalMs: 1 });
     assert.strictEqual(done.status, "completed");
     assert.ok(calls[0].includes("/api/v1/analyze"));
+  });
+});
+
+suite("findingMerge", () => {
+  const now = new Date().toISOString();
+  const f = (partial: Partial<Finding>): Finding => ({
+    id: "x",
+    source: "baseline",
+    surface: "package",
+    severity: "high",
+    title: "t",
+    message: "m",
+    path: "/repo/package.json",
+    workspaceRoot: "/repo",
+    acknowledged: false,
+    createdAt: now,
+    ...partial,
+  });
+
+  test("baseline replace drops removed in-scope finding but keeps ack on stable id", () => {
+    const existing = [
+      f({ id: "gone", path: "/repo/old.json", packageName: "old" }),
+      f({ id: "keep", path: "/repo/package.json", packageName: "lodash" }),
+      f({ id: "other", workspaceRoot: "/other", path: "/other/package.json" }),
+    ];
+    const incoming = [f({ id: "keep", path: "/repo/package.json", packageName: "lodash" })];
+    const acks = { keep: now };
+    const merged = replaceBaselineFindings(existing, incoming, acks, ["/repo"]);
+    assert.ok(!merged.some((x) => x.id === "gone"));
+    assert.ok(merged.some((x) => x.id === "other"));
+    const keep = merged.find((x) => x.id === "keep");
+    assert.strictEqual(keep?.acknowledged, true);
+  });
+
+  test("delta prunes findings whose path left the live inventory", () => {
+    const existing = [
+      f({ id: "a", path: "/repo/package.json" }),
+      f({ id: "b", path: "/repo/gone-lock" }),
+    ];
+    const pruned = applyDeltaFindings(existing, [], {}, new Set(["/repo/package.json"]), ["/repo"]);
+    assert.deepStrictEqual(
+      pruned.map((x) => x.id).sort(),
+      ["a"],
+    );
+  });
+
+  test("scopeFindingsForDisplay hides other workspace roots", () => {
+    const findings = [
+      f({ id: "a", workspaceRoot: "/repo" }),
+      f({ id: "b", workspaceRoot: "/other" }),
+      f({ id: "c", workspaceRoot: undefined, path: "/home/.cursor/mcp.json" }),
+    ];
+    const shown = scopeFindingsForDisplay(findings, ["/repo"]);
+    assert.deepStrictEqual(
+      shown.map((x) => x.id).sort(),
+      ["a", "c"],
+    );
+  });
+});
+
+suite("apiKeyStore", () => {
+  test("set get clear and migrate plaintext", async () => {
+    const map = new Map<string, string>();
+    const secrets = {
+      get: async (key: string) => map.get(key),
+      store: async (key: string, value: string) => {
+        map.set(key, value);
+      },
+      delete: async (key: string) => {
+        map.delete(key);
+      },
+    };
+    const store = new ApiKeyStore(secrets);
+    await store.set("  secret-key  ");
+    assert.strictEqual(await store.get(), "secret-key");
+    await store.clear();
+    assert.strictEqual(await store.get(), "");
+
+    let cleared = false;
+    const migrated = await store.migrateFromPlaintext("from-settings", async () => {
+      cleared = true;
+    });
+    assert.strictEqual(migrated, true);
+    assert.strictEqual(await store.get(), "from-settings");
+    assert.strictEqual(cleared, true);
+  });
+});
+
+suite("lockfile parsers", () => {
+  test("parsePnpmPackageKey handles scoped and unscoped", () => {
+    assert.deepStrictEqual(parsePnpmPackageKey("/lodash@4.17.21"), { name: "lodash", version: "4.17.21" });
+    assert.deepStrictEqual(parsePnpmPackageKey("/@scope/pkg@1.2.3"), { name: "@scope/pkg", version: "1.2.3" });
+  });
+
+  test("parseYarnLockBody extracts pinned versions", () => {
+    const body = `# yarn lockfile v1
+lodash@^4.17.21:
+  version "4.17.21"
+  resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.17.21.tgz"
+`;
+    assert.deepStrictEqual(parseYarnLockBody(body), [{ name: "lodash", version: "4.17.21" }]);
+  });
+
+  test("inventories pnpm-lock and yarn.lock", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "inv-lock-"));
+    fs.writeFileSync(
+      path.join(root, "pnpm-lock.yaml"),
+      `lockfileVersion: '9.0'\npackages:\n  /left-pad@1.3.0:\n    resolution: {integrity: sha512-abc}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(root, "yarn.lock"),
+      `# yarn lockfile v1\nms@2.1.3:\n  version "2.1.3"\n`,
+      "utf8",
+    );
+    const items = inventoryWorkspaceRoot(root);
+    assert.ok(items.some((i) => i.packageName === "left-pad" && i.version === "1.3.0"));
+    assert.ok(items.some((i) => i.packageName === "ms" && i.version === "2.1.3"));
+  });
+});
+
+suite("homeWatchRoots", () => {
+  test("skills pattern is RelativePattern-safe", () => {
+    const roots = homeWatchRoots("/tmp/home");
+    const skills = roots.find((r) => r.dir.replace(/\\/g, "/").endsWith(".cursor/skills"));
+    assert.ok(skills);
+    assert.strictEqual(skills!.pattern, "**/*");
+    assert.ok(!skills!.dir.includes("**"));
+  });
+});
+
+suite("ack + status alignment", () => {
+  test("package OSV high is ackable and clears badge/status when acked", () => {
+    const now = new Date().toISOString();
+    const high: Finding = {
+      id: "cve",
+      source: "baseline",
+      surface: "package",
+      severity: "high",
+      title: "This npm package is vulnerable",
+      message: "Description: CVE",
+      path: "/repo/package.json",
+      acknowledged: false,
+      createdAt: now,
+    };
+    assert.strictEqual(needsAckPopup(high), true);
+    assert.strictEqual(countUnackedHighCritical([high]), 1);
+    assert.match(statusBarText([high]), /high/);
+    const acked = { ...high, acknowledged: true };
+    assert.strictEqual(needsAckPopup(acked), false);
+    assert.strictEqual(countUnackedHighCritical([acked]), 0);
+    assert.strictEqual(statusBarText([acked]), "Chaintrap: ready");
   });
 });

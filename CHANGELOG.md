@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.5
+
+- API key moves to VS Code SecretStorage (Set/Clear commands); plaintext setting deprecated + one-time migrate
+- Baseline replaces in-scope findings; delta prunes removed paths; UI scoped to open roots + user config
+- Badge, ack modal, and Acknowledge command agree on critical + all high; status bar refreshes after ack
+- Scan lock: skip/coalesce delta while baseline (or another delta) runs
+- Parse `pnpm-lock.yaml` / `yarn.lock` pinned packages; offline unverified findings show in Problems
+- Spec Kit feature `specs/002-finding-trust`
+
 ## 0.1.4
 
 - Scan efficiency: single-pass inventory, reuse skill/rule content in-memory, skip re-analysis when item hash matches prior baseline

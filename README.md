@@ -36,7 +36,7 @@ No Chaintrap API key is required for package/MCP checks. OSV is public.
 
 | Surface | Paths |
 |---------|--------|
-| Dependencies | `package.json`, `package-lock.json`, `requirements.txt` |
+| Dependencies | `package.json`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `requirements.txt` (`uv.lock` watched, parse deferred) |
 | MCP | workspace `.cursor/mcp.json`, `~/.cursor/mcp.json`, VS Code User `mcp.json` |
 | Skills | `.cursor/skills/**/SKILL.md`, `.claude/skills/**/SKILL.md` |
 | Rules | `.cursor/rules/**`, `AGENTS.md`, `.cursorrules` |
@@ -53,7 +53,7 @@ No Chaintrap API key is required for package/MCP checks. OSV is public.
 - Package **name + version** (and MCP-inferred packages) are sent to `https://api.osv.dev/v1/querybatch`.
 - Skill and rule **file contents stay on your machine**.
 - Source code is not uploaded.
-- Optional Chaintrap deep extension scans send only the VS Code extension id to `scan.chaintrap.com` when you set `chaintrap.apiKey`.
+- Optional Chaintrap deep extension scans send only the VS Code extension id to `scan.chaintrap.com` when you store a key via **Chaintrap: Set API key** (SecretStorage).
 
 Permissions: the extension only watches the globs listed above (plus user-level Cursor MCP/skills). It does not request a broad `*` filesystem permission beyond those paths.
 
@@ -64,7 +64,7 @@ Full policy: [PRIVACY.md](PRIVACY.md) · [https://chaintrap.com](https://chaintr
 | Setting | Default | Purpose |
 |---------|---------|---------|
 | `chaintrap.apiBase` | `https://scan.chaintrap.com` | Optional deep-scan API |
-| `chaintrap.apiKey` | empty | Optional `X-API-Key` |
+| `chaintrap.apiKey` | empty | **Deprecated** — use **Chaintrap: Set API key** (SecretStorage) |
 | `chaintrap.enableDeepExtensionScan` | `false` | Notify when VS Code extensions change |
 
 ## Develop

@@ -2,7 +2,7 @@
   "name": "chaintrap-agent-shield",
   "displayName": "Chaintrap Agent Shield",
   "description": "EDR-style visibility for AI coding agents: baseline-scan workspace packages, MCP servers, skills, and rules; warn on malicious or vulnerable installs.",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "publisher": "pri17m",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -39,11 +39,19 @@
       },
       {
         "command": "chaintrap.acknowledgeFinding",
-        "title": "Chaintrap: Acknowledge critical finding"
+        "title": "Chaintrap: Acknowledge high/critical finding"
       },
       {
         "command": "chaintrap.openFindingLocation",
         "title": "Chaintrap: Open finding location"
+      },
+      {
+        "command": "chaintrap.setApiKey",
+        "title": "Chaintrap: Set API key (SecretStorage)"
+      },
+      {
+        "command": "chaintrap.clearApiKey",
+        "title": "Chaintrap: Clear API key"
       },
       {
         "command": "chaintrap.scanInstalledExtensions",
@@ -82,7 +90,7 @@
         "chaintrap.apiKey": {
           "type": "string",
           "default": "",
-          "description": "Optional Chaintrap API key (X-API-Key) for v1.1 deep extension scans."
+          "markdownDescription": "**Deprecated.** Use **Chaintrap: Set API key** (SecretStorage). Plaintext values are migrated once on activate then cleared when possible."
         },
         "chaintrap.enableDeepExtensionScan": {
           "type": "boolean",

@@ -130,6 +130,93 @@ function parsePackageLock(filePath: string, workspaceRoot: string, items: Invent
   }
 }
 
+/** Extract name@version from pnpm packages keys like `/lodash@4.17.21` or `@scope/pkg@1.0.0`. */
+export function parsePnpmPackageKey(key: string): { name: string; version: string } | null {
+  const k = key.trim().replace(/^['"]|['"]$/g, "");
+  if (!k || k === "." || k.startsWith("file:")) {
+    return null;
+  }
+  const body = k.startsWith("/") ? k.slice(1) : k;
+  if (body.startsWith("@")) {
+    const idx = body.lastIndexOf("@");
+    if (idx <= 0) {
+      return null;
+    }
+    return { name: body.slice(0, idx).toLowerCase(), version: body.slice(idx + 1) || "unknown" };
+  }
+  const idx = body.lastIndexOf("@");
+  if (idx <= 0) {
+    return null;
+  }
+  return { name: body.slice(0, idx).toLowerCase(), version: body.slice(idx + 1) || "unknown" };
+}
+
+function parsePnpmLock(filePath: string, workspaceRoot: string, items: InventoryItem[]): void {
+  const raw = readText(filePath);
+  if (!raw) {
+    return;
+  }
+  // Prefer JSON-like packages: block keys; also accept importers-less classic YAML keys under packages:
+  const packagesIdx = raw.search(/^packages:\s*$/m);
+  if (packagesIdx < 0) {
+    return;
+  }
+  const section = raw.slice(packagesIdx);
+  const keyRe = /^\s{2}('([^']+)'|"([^"]+)"|(\/[^\s:]+|[^\s:][^:]*)):\s*$/gm;
+  let m: RegExpExecArray | null;
+  while ((m = keyRe.exec(section))) {
+    const key = m[2] || m[3] || m[4] || "";
+    const parsed = parsePnpmPackageKey(key);
+    if (parsed) {
+      addPackage(items, workspaceRoot, filePath, "npm", parsed.name, parsed.version);
+    }
+  }
+}
+
+/** Yarn classic lock: `name@version:` then `  version "x.y.z"`. */
+export function parseYarnLockBody(raw: string): Array<{ name: string; version: string }> {
+  const out: Array<{ name: string; version: string }> = [];
+  const lines = raw.split(/\r?\n/);
+  let pendingNames: string[] = [];
+  for (const line of lines) {
+    if (!line.trim() || line.startsWith("#")) {
+      continue;
+    }
+    const header = line.match(/^"?(@?[^@\s"]+)@[^:]+:"?\s*$/);
+    if (header && !line.startsWith(" ")) {
+      // Multi-key headers: "a@1, b@1:"
+      pendingNames = line
+        .replace(/:$/, "")
+        .split(",")
+        .map((part) => {
+          const p = part.trim().replace(/^"|"$/g, "");
+          const at = p.startsWith("@") ? p.lastIndexOf("@") : p.indexOf("@");
+          return at > 0 ? p.slice(0, at).toLowerCase() : "";
+        })
+        .filter(Boolean);
+      continue;
+    }
+    const ver = line.match(/^\s+version\s+"([^"]+)"/);
+    if (ver && pendingNames.length) {
+      for (const name of pendingNames) {
+        out.push({ name, version: ver[1] });
+      }
+      pendingNames = [];
+    }
+  }
+  return out;
+}
+
+function parseYarnLock(filePath: string, workspaceRoot: string, items: InventoryItem[]): void {
+  const raw = readText(filePath);
+  if (!raw) {
+    return;
+  }
+  for (const { name, version } of parseYarnLockBody(raw)) {
+    addPackage(items, workspaceRoot, filePath, "npm", name, version);
+  }
+}
+
 function parseRequirements(filePath: string, workspaceRoot: string, items: InventoryItem[]): void {
   const raw = readText(filePath);
   if (!raw) {
@@ -255,6 +342,15 @@ export function inventoryWorkspaceRoot(workspaceRoot: string): InventoryItem[] {
   if (fs.existsSync(lock)) {
     parsePackageLock(lock, workspaceRoot, items);
   }
+  const pnpm = path.join(workspaceRoot, "pnpm-lock.yaml");
+  if (fs.existsSync(pnpm)) {
+    parsePnpmLock(pnpm, workspaceRoot, items);
+  }
+  const yarn = path.join(workspaceRoot, "yarn.lock");
+  if (fs.existsSync(yarn)) {
+    parseYarnLock(yarn, workspaceRoot, items);
+  }
+  // uv.lock watched for deltas but not parsed yet (deferred — TOML)
   const req = path.join(workspaceRoot, "requirements.txt");
   if (fs.existsSync(req)) {
     parseRequirements(req, workspaceRoot, items);
