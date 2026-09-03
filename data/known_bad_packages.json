@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "updated": "2026-06-10",
+  "npm": {
+    "@redhat-cloud-services/types": ["3.6.1", "3.6.2", "3.6.4"],
+    "@redhat-cloud-services/frontend-components": ["7.7.2", "7.7.3", "7.7.5"],
+    "@redhat-cloud-services/rbac-client": ["9.0.3", "9.0.4", "9.0.6"],
+    "@redhat-cloud-services/insights-client": ["4.0.4", "4.0.5", "4.0.7"],
+    "@zapier/zapier-sdk": ["0.15.5", "0.15.6", "0.15.7"],
+    "posthog-node": ["5.13.3", "4.18.1"],
+    "@postman/postman-mcp-cli": ["1.0.3", "1.0.4"],
+    "@asyncapi/specs": ["6.8.2", "6.9.1"],
+    "nx": ["20.9.0", "20.10.0", "20.11.0", "20.12.0", "21.5.0", "21.6.0", "21.7.0", "21.8.0"],
+    "@nrwl/nx": ["20.9.0", "20.10.0", "20.11.0", "20.12.0", "21.5.0", "21.6.0", "21.7.0", "21.8.0"],
+    "@tiledesk/tiledesk-server": ["2.18.6", "2.18.7", "2.18.8", "2.18.9", "2.18.10", "2.18.11", "2.18.12"],
+    "polymarket-trading-cli": ["1.0.0", "1.0.1"],
+    "polymarket-terminal": ["1.0.0", "1.0.1"],
+    "polymarket-bot": ["1.0.0", "1.0.1"]
+  },
+  "pypi": {},
+  "references": {
+    "npm:@redhat-cloud-services/types@3.6.1": {
+      "campaign": "Miasma",
+      "note": "Red Hat npm supply chain Jun 2026",
+      "url": "https://www.microsoft.com/en-us/security/blog/2026/06/02/preinstall-persistence-inside-red-hat-npm-miasma-credential-stealing-campaign/"
+    },
+    "npm:@zapier/zapier-sdk@0.15.5": {
+      "campaign": "Shai-Hulud 2.0",
+      "note": "Self-replicating npm worm Nov 2025",
+      "url": "https://unit42.paloaltonetworks.com/npm-supply-chain-attack/"
+    },
+    "npm:nx@20.9.0": {
+      "campaign": "s1ngularity",
+      "note": "Nx postinstall telemetry.js Aug 2025",
+      "url": "https://snyk.io/blog/weaponizing-ai-coding-agents-for-malware-in-the-nx-malicious-package/"
+    },
+    "npm:@tiledesk/tiledesk-server@2.18.6": {
+      "campaign": "Megalodon",
+      "note": "Bundled poisoned workflow May 2026",
+      "url": "https://labs.cloudsecurityalliance.org/research/csa-research-note-megalodon-github-actions-cicd-supply-chain/"
+    },
+    "npm:polymarket-trading-cli@1.0.0": {
+      "campaign": "Megalodon",
+      "note": "Typosquat npm package with postinstall exfil",
+      "url": "https://www.rescana.com/post/megalodon-supply-chain-attack-teampcp-compromises-5-561-github-repositories-via-malicious-ci-cd-workflows"
+    }
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "name": "chaintrap-agent-shield",
+  "displayName": "Chaintrap Agent Shield",
+  "description": "EDR-style visibility for AI coding agents: baseline-scan workspace packages, MCP servers, skills, and rules; warn on malicious or vulnerable installs.",
+  "version": "0.1.0",
+  "publisher": "pri17m",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#0B1220",
+    "theme": "dark"
+  },
+  "categories": ["Other", "Linters"],
+  "keywords": [
+    "security",
+    "supply-chain",
+    "mcp",
+    "osv",
+    "malware",
+    "cursor",
+    "ai-agent"
+  ],
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "chaintrap.rescanBaseline",
+        "title": "Chaintrap: Rescan workspace baseline"
+      },
+      {
+        "command": "chaintrap.reviewDelta",
+        "title": "Chaintrap: Review agent changes since last session"
+      },
+      {
+        "command": "chaintrap.acknowledgeFinding",
+        "title": "Chaintrap: Acknowledge critical finding"
+      },
+      {
+        "command": "chaintrap.scanInstalledExtensions",
+        "title": "Chaintrap: Deep-scan installed VS Code extensions (API key)"
+      },
+      {
+        "command": "chaintrap.installGuard",
+        "title": "Chaintrap: Open Guard install-protection docs"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "chaintrap",
+          "title": "Chaintrap",
+          "icon": "media/activitybar.svg"
+        }
+      ]
+    },
+    "views": {
+      "chaintrap": [
+        {
+          "id": "chaintrap.activity",
+          "name": "Agent Activity"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Chaintrap Agent Shield",
+      "properties": {
+        "chaintrap.apiBase": {
+          "type": "string",
+          "default": "https://scan.chaintrap.com",
+          "description": "Chaintrap API base URL for optional deep VS Code extension scans."
+        },
+        "chaintrap.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Optional Chaintrap API key (X-API-Key) for v1.1 deep extension scans."
+        },
+        "chaintrap.enableDeepExtensionScan": {
+          "type": "boolean",
+          "default": false,
+          "description": "When an API key is set, queue deep scans for newly installed VS Code extensions."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "npm run compile && mocha --ui tdd --timeout 10000 out/test/**/*.test.js",
+    "package": "npx --yes @vscode/vsce package --no-dependencies",
+    "sync-intel": "node scripts/sync-intel.mjs"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.17.10",
+    "@types/vscode": "^1.85.0",
+    "mocha": "^11.1.0",
+    "typescript": "^5.7.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pri17m/chaintrap-agent-shield.git"
+  },
+  "bugs": {
+    "url": "https://github.com/pri17m/chaintrap-agent-shield/issues"
+  },
+  "homepage": "https://chaintrap.com"
+}

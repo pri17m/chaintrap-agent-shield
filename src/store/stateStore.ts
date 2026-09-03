@@ -1,0 +1,59 @@
+import * as vscode from "vscode";
+import type { BaselineSnapshot, Finding, InventoryItem } from "../types";
+
+const BASELINE_KEY = "chaintrap.baselines.v1";
+const FINDINGS_KEY = "chaintrap.findings.v1";
+const ACK_KEY = "chaintrap.acks.v1";
+const SESSION_KEY = "chaintrap.sessionStartedAt";
+
+export class StateStore {
+  constructor(private readonly ctx: vscode.ExtensionContext) {}
+
+  getBaselines(): Record<string, BaselineSnapshot> {
+    return this.ctx.globalState.get<Record<string, BaselineSnapshot>>(BASELINE_KEY, {});
+  }
+
+  async setBaseline(snapshot: BaselineSnapshot): Promise<void> {
+    const all = this.getBaselines();
+    all[snapshot.workspaceRoot] = snapshot;
+    await this.ctx.globalState.update(BASELINE_KEY, all);
+  }
+
+  getFindings(): Finding[] {
+    return this.ctx.globalState.get<Finding[]>(FINDINGS_KEY, []);
+  }
+
+  async setFindings(findings: Finding[]): Promise<void> {
+    await this.ctx.globalState.update(FINDINGS_KEY, findings);
+  }
+
+  getAcks(): Record<string, string> {
+    return this.ctx.globalState.get<Record<string, string>>(ACK_KEY, {});
+  }
+
+  async acknowledge(id: string): Promise<void> {
+    const acks = this.getAcks();
+    acks[id] = new Date().toISOString();
+    await this.ctx.globalState.update(ACK_KEY, acks);
+    const findings = this.getFindings().map((f) => (f.id === id ? { ...f, acknowledged: true } : f));
+    await this.setFindings(findings);
+  }
+
+  sessionStartedAt(): string {
+    const existing = this.ctx.workspaceState.get<string>(SESSION_KEY);
+    if (existing) {
+      return existing;
+    }
+    const now = new Date().toISOString();
+    void this.ctx.workspaceState.update(SESSION_KEY, now);
+    return now;
+  }
+
+  snapshotFromItems(workspaceRoot: string, items: InventoryItem[]): BaselineSnapshot {
+    const map: Record<string, InventoryItem> = {};
+    for (const item of items) {
+      map[item.key] = item;
+    }
+    return { workspaceRoot, scannedAt: new Date().toISOString(), items: map };
+  }
+}
