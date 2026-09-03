@@ -16,11 +16,15 @@ No Chaintrap API key is required for package/MCP checks. OSV is public.
 
 ## 60-second setup
 
-1. Install from [GitHub Releases](https://github.com/pri17m/chaintrap-agent-shield/releases) (`code --install-extension chaintrap-agent-shield-0.1.0.vsix`), or from the Marketplace (`pri17m.chaintrap-agent-shield`) once `vsce publish` succeeds for publisher `pri17m`.
+1. Install from [GitHub Releases](https://github.com/pri17m/chaintrap-agent-shield/releases) (`code --install-extension chaintrap-agent-shield-0.1.4.vsix`), or from the Marketplace (`pri17m.chaintrap-agent-shield`) once `vsce publish` succeeds for publisher `pri17m`.
 2. Open a folder. Status bar: `Chaintrap: scanning workspace…` then `baseline complete`.
 3. Open the **Chaintrap** activity bar for baseline vs delta findings.
 
 ## Screenshots
+
+![Agent Activity tree with a suspicious skill finding and acknowledgment modal](media/screenshots/agent-activity-ack.png)
+
+*Agent Activity — baseline/delta findings plus the “I understand the risk” ack modal for a suspicious skill.*
 
 ![Agent Activity tree with baseline vs delta findings](media/screenshots/activity.png)
 
