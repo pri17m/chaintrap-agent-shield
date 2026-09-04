@@ -9,6 +9,7 @@ import { needsAckPopup } from "./ui/findingCopy";
 import { uninstallMaliciousFinding } from "./ui/uninstallFlow";
 import { ProblemsReporter } from "./ui/problems";
 import { createWatchers } from "./watchers/fileWatchers";
+import { normalizeApiBase, resolveExternalHttpUrl } from "./api/urlSafety";
 
 export function activate(context: vscode.ExtensionContext): void {
   const store = new StateStore(context);
@@ -118,7 +119,15 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("chaintrap.scanInstalledExtensions", async () => {
       const cfg = vscode.workspace.getConfiguration("chaintrap");
       const apiKey = await apiKeys.get();
-      const apiBase = String(cfg.get("apiBase") || "https://scan.chaintrap.com");
+      const inspected = cfg.inspect<string>("apiBase");
+      const rawApiBase = String(inspected?.globalValue ?? inspected?.defaultValue ?? "https://scan.chaintrap.com");
+      const hasWorkspaceOverride = inspected?.workspaceValue !== undefined || inspected?.workspaceFolderValue !== undefined;
+      if (hasWorkspaceOverride) {
+        void vscode.window.showWarningMessage(
+          "Chaintrap: ignoring workspace-level chaintrap.apiBase for security. Set it in User settings instead.",
+        );
+      }
+      const normalized = normalizeApiBase(rawApiBase);
       if (!apiKey) {
         void vscode.window.showWarningMessage(
           "No API key in SecretStorage. Run Chaintrap: Set API key.",
@@ -130,6 +139,12 @@ export function activate(context: vscode.ExtensionContext): void {
         });
         return;
       }
+      if (!normalized.ok) {
+        void vscode.window.showErrorMessage(
+          `Chaintrap API base URL is invalid or unsafe (${normalized.error}). Use an https:// URL (or http://localhost for local testing).`,
+        );
+        return;
+      }
       const exts = vscode.extensions.all.filter((e) => !e.id.startsWith("vscode."));
       const picked = await vscode.window.showQuickPick(
         exts.map((e) => ({ label: e.id, description: e.packageJSON?.version ? String(e.packageJSON.version) : "" })),
@@ -137,6 +152,7 @@ export function activate(context: vscode.ExtensionContext): void {
       if (!picked) {
         return;
       }
+      const apiBase = normalized.value;
       const client = new ChaintrapClient(apiBase, apiKey);
       try {
         const job = await client.analyzeExtension(picked.label, "vscode");
@@ -148,7 +164,12 @@ export function activate(context: vscode.ExtensionContext): void {
             "Open report",
           );
           if (open === "Open report") {
-            await vscode.env.openExternal(vscode.Uri.parse(url.startsWith("http") ? url : `${apiBase}${url}`));
+            const resolved = resolveExternalHttpUrl(url, apiBase);
+            if (!resolved) {
+              void vscode.window.showWarningMessage("Chaintrap: report URL was invalid.");
+              return;
+            }
+            await vscode.env.openExternal(vscode.Uri.parse(resolved));
           }
         } else {
           void vscode.window.showInformationMessage(`Scan ${done.status}: ${done.error_message || "no report URL"}`);
