@@ -15,22 +15,32 @@
 </div>
 
 <p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
-Workspace visibility for packages introduced by AI coding agents (Cursor, Claude Code, GitHub Copilot). Chaintrap inventories npm and PyPI pins in the open folder and in MCP server configs, classifies each as malicious or vulnerable, and shows a workspace posture rollup so the operator can see what needs attention, what coverage is incomplete, and what was checked.
+AI-coding supply-chain security for Cursor / VS Code. Chaintrap inventories npm and PyPI pins in the open workspace and in MCP configs, classifies each as malicious (OSV MAL-* or known-bad) or vulnerable (CVE/GHSA), and surfaces a posture rollup so you can review what the agent pulled in.
 </p>
 
 <img src="media/screenshots/chaintrap-tree.png" alt="Chaintrap activity bar: Dependencies and MCP servers grouped as malicious, vulnerable, or unpinned">
+
+<h2 style="font-family: Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif; font-weight: 700;">Why this exists</h2>
+
+<ul style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
+<li><b>Agents edit lockfiles and MCP configs.</b> That’s where malicious packages and known-bad versions land.</li>
+<li><b>MCP servers often run via <code>npx</code> / <code>pip</code>.</b> Those pins are dependencies too — just not in your <code>package.json</code>.</li>
+<li><b>You need visibility in the editor.</b> Review baseline vs “delta since this session opened” before you trust outputs.</li>
+</ul>
 
 <h2 style="font-family: Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif; font-weight: 700;">Coverage</h2>
 
 <ul style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
 <li><b>Dependencies:</b> workspace manifests and lockfiles. With a lockfile, locked transitives are included.</li>
-<li><b>MCP servers:</b> the package inferred from each server entry in workspace <code>.vscode/mcp.json</code> or <code>.cursor/mcp.json</code> (for example <code>npx</code> or <code>pip</code>), plus user-level MCP configs. Listed separately from project dependencies so the operator sees which server pulled the pin.</li>
+<li><b>MCP servers (MCP security):</b> the package inferred from each server entry in workspace <code>.vscode/mcp.json</code> or <code>.cursor/mcp.json</code> (for example <code>npx</code> or <code>pip</code>), plus user-level MCP configs. Listed separately from project dependencies so you can see which server pulled the pin.</li>
 <li><b>Unpinned MCP servers:</b> config has a package name and no version, so the pin cannot be checked.</li>
 </ul>
 
 <p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
 Findings are malicious (known-bad or malware advisory) or vulnerable (CVE or GHSA). High and critical findings require an acknowledgement in the editor.
 </p>
+
+<img src="media/screenshots/ack.png" alt="In-editor acknowledgment modal for a critical known-bad package">
 
 <img src="media/screenshots/uninstall-mcp.png" alt="Confirm removal of one MCP server from mcp.json">
 
@@ -46,10 +56,11 @@ Malicious MCP servers are removed from that config by server id. Malicious npm a
 <li>Install <code>pri17m.chaintrap-agent-shield</code>.</li>
 <li>Open a workspace folder. Status bar: <code>Chaintrap: scanning workspace…</code></li>
 <li>Open the Chaintrap activity bar: <b>Workspace posture</b> first (attention, coverage gaps, what was checked), then <b>Dependencies</b> or <b>MCP servers</b>.</li>
+<li>Before trusting an AI agent’s output, run <b>Chaintrap: Review agent changes since last session</b>.</li>
 </ol>
 
 <p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
-No API key is required for this scan. The extension reads dependency and MCP files in open folders. It does not execute workspace code and does not upload source. See <a href="PRIVACY.md"><b>PRIVACY.md</b></a>.
+No API key is required for the workspace scan. The extension reads dependency and MCP files in open folders, does not execute workspace code, and does not upload source. It queries OSV with <b>package name + version only</b>. See <a href="PRIVACY.md"><b>PRIVACY.md</b></a>.
 </p>
 
 <h2 style="font-family: Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif; font-weight: 700;">Commands</h2>
