@@ -468,6 +468,26 @@ suite("inventory + diff", () => {
     assert.ok(items.some((i) => i.kind === "rule" && i.path.endsWith("settings.json")));
   });
 
+  test("inventories workspace .vscode/mcp.json", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "inv-vscode-mcp-"));
+    fs.mkdirSync(path.join(root, ".vscode"), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, ".vscode", "mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          vs: { command: "npx", args: ["-y", "left-pad@1.3.0"] },
+        },
+      }),
+      "utf8",
+    );
+    const items = inventoryWorkspaceRoot(root);
+    const mcp = items.find((i) => i.kind === "mcp" && i.mcpId === "vs");
+    assert.ok(mcp);
+    assert.match(mcp!.path.replace(/\\/g, "/"), /\.vscode\/mcp\.json$/);
+    assert.strictEqual(mcp!.packageName, "left-pad");
+    assert.strictEqual(mcp!.version, "1.3.0");
+  });
+
   test("attaches ephemeral content and persistableItem strips it", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "inv-content-"));
     fs.mkdirSync(path.join(root, ".cursor", "skills", "demo"), { recursive: true });
@@ -976,7 +996,7 @@ suite("ack + status alignment", () => {
     const acked = { ...high, acknowledged: true };
     assert.strictEqual(needsAckPopup(acked), false);
     assert.strictEqual(countUnackedHighCritical([acked]), 0);
-    assert.strictEqual(statusBarText([acked]), "Chaintrap: ready");
+    assert.strictEqual(statusBarText([acked]), "Chaintrap: workspace clear");
   });
 });
 

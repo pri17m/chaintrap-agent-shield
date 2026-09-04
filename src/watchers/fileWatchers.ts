@@ -16,6 +16,7 @@ export function createWatchers(onChange: () => void): vscode.Disposable {
     "**/Pipfile.lock",
     "**/requirements.txt",
     "**/.cursor/mcp.json",
+    "**/.vscode/mcp.json",
     "**/.cursor/skills/**",
     "**/.cursor/commands/**",
     "**/.cursor/rules/**",

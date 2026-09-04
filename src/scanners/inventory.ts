@@ -357,6 +357,10 @@ export function inventoryWorkspaceRoot(workspaceRoot: string): InventoryItem[] {
   if (fs.existsSync(mcpWs)) {
     parseMcpFile(mcpWs, workspaceRoot, items);
   }
+  const mcpVscode = path.join(workspaceRoot, ".vscode", "mcp.json");
+  if (fs.existsSync(mcpVscode)) {
+    parseMcpFile(mcpVscode, workspaceRoot, items);
+  }
   const skillFiles: string[] = [];
   walkFiles(path.join(workspaceRoot, ".cursor", "skills"), isSkillContentFile, skillFiles);
   walkFiles(path.join(workspaceRoot, ".claude", "skills"), isSkillContentFile, skillFiles);

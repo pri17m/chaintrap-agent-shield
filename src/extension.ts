@@ -6,6 +6,7 @@ import { openFindingLocation } from "./ui/ackFlow";
 import { AgentActivityProvider, FindingItem } from "./ui/agentActivityTree";
 import { ShieldController } from "./ui/controller";
 import { needsAckPopup } from "./ui/findingCopy";
+import { PostureProvider } from "./ui/postureTree";
 import { uninstallMaliciousFinding } from "./ui/uninstallFlow";
 import { ProblemsReporter } from "./ui/problems";
 import { createWatchers } from "./watchers/fileWatchers";
@@ -19,11 +20,16 @@ export function activate(context: vscode.ExtensionContext): void {
   const problems = new ProblemsReporter(diagnostics);
   const depTree = new AgentActivityProvider("package");
   const mcpTree = new AgentActivityProvider("mcp");
+  const postureTree = new PostureProvider();
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 80);
-  status.command = "chaintrap.reviewDelta";
+  status.command = "chaintrap.focusPosture";
   status.text = "Chaintrap: starting";
   status.show();
 
+  const postureView = vscode.window.createTreeView("chaintrap.posture", {
+    treeDataProvider: postureTree,
+    showCollapseAll: true,
+  });
   const depView = vscode.window.createTreeView("chaintrap.activity", {
     treeDataProvider: depTree,
     showCollapseAll: true,
@@ -32,7 +38,7 @@ export function activate(context: vscode.ExtensionContext): void {
     treeDataProvider: mcpTree,
     showCollapseAll: true,
   });
-  const controller = new ShieldController(store, problems, [depTree, mcpTree], status, [depView, mcpView]);
+  const controller = new ShieldController(store, problems, [depTree, mcpTree], postureTree, status, [depView, mcpView], postureView);
   const folders = () => vscode.workspace.workspaceFolders || [];
 
   void (async () => {
@@ -53,6 +59,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     diagnostics,
     status,
+    postureView,
     depView,
     mcpView,
     watchers,
@@ -65,6 +72,10 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     }),
     vscode.commands.registerCommand("chaintrap.rescanBaseline", () => controller.runBaseline(folders())),
+    vscode.commands.registerCommand("chaintrap.focusPosture", async () => {
+      await vscode.commands.executeCommand("workbench.view.extension.chaintrap");
+      await vscode.commands.executeCommand("chaintrap.posture.focus");
+    }),
     vscode.commands.registerCommand("chaintrap.reviewDelta", async () => {
       const delta = controller.deltaSinceSession();
       if (delta.length === 0) {

@@ -2,7 +2,7 @@
   "name": "chaintrap-agent-shield",
   "displayName": "Chaintrap Agent Shield — AI-Coding Security",
   "description": "Inventory malicious and vulnerable npm/PyPI packages in the workspace and in MCP server configs. Classify malware vs CVE. Remove the pin from the editor.",
-  "version": "0.1.23",
+  "version": "0.1.24",
   "publisher": "pri17m",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -44,6 +44,10 @@
         "title": "Chaintrap: Review agent changes since last session"
       },
       {
+        "command": "chaintrap.focusPosture",
+        "title": "Chaintrap: Show workspace posture"
+      },
+      {
         "command": "chaintrap.acknowledgeFinding",
         "title": "Chaintrap: Acknowledge high/critical finding"
       },
@@ -79,6 +83,10 @@
     },
     "views": {
       "chaintrap": [
+        {
+          "id": "chaintrap.posture",
+          "name": "Workspace posture"
+        },
         {
           "id": "chaintrap.activity",
           "name": "Dependencies"

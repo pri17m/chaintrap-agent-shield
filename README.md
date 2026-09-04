@@ -15,7 +15,7 @@
 </div>
 
 <p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
-Workspace visibility for packages introduced by AI coding agents (Cursor, Claude Code, GitHub Copilot). Chaintrap inventories npm and PyPI pins in the open folder and in MCP server configs, classifies each as malicious or vulnerable, and lets the operator remove the pin from the editor.
+Workspace visibility for packages introduced by AI coding agents (Cursor, Claude Code, GitHub Copilot). Chaintrap inventories npm and PyPI pins in the open folder and in MCP server configs, classifies each as malicious or vulnerable, and shows a workspace posture rollup so the operator can see what needs attention, what coverage is incomplete, and what was checked.
 </p>
 
 <img src="media/screenshots/chaintrap-tree.png" alt="Chaintrap activity bar: Dependencies and MCP servers grouped as malicious, vulnerable, or unpinned">
@@ -24,7 +24,7 @@ Workspace visibility for packages introduced by AI coding agents (Cursor, Claude
 
 <ul style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
 <li><b>Dependencies:</b> workspace manifests and lockfiles. With a lockfile, locked transitives are included.</li>
-<li><b>MCP servers:</b> the package inferred from each server entry in <code>mcp.json</code> (for example <code>npx</code> or <code>pip</code>). Listed separately from project dependencies so the operator sees which server pulled the pin.</li>
+<li><b>MCP servers:</b> the package inferred from each server entry in workspace <code>.vscode/mcp.json</code> or <code>.cursor/mcp.json</code> (for example <code>npx</code> or <code>pip</code>), plus user-level MCP configs. Listed separately from project dependencies so the operator sees which server pulled the pin.</li>
 <li><b>Unpinned MCP servers:</b> config has a package name and no version, so the pin cannot be checked.</li>
 </ul>
 
@@ -45,7 +45,7 @@ Malicious MCP servers are removed from that config by server id. Malicious npm a
 <ol style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
 <li>Install <code>pri17m.chaintrap-agent-shield</code>.</li>
 <li>Open a workspace folder. Status bar: <code>Chaintrap: scanning workspace…</code></li>
-<li>Open the Chaintrap activity bar: <b>Dependencies</b> or <b>MCP servers</b>.</li>
+<li>Open the Chaintrap activity bar: <b>Workspace posture</b> first (attention, coverage gaps, what was checked), then <b>Dependencies</b> or <b>MCP servers</b>.</li>
 </ol>
 
 <p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
@@ -62,6 +62,10 @@ No API key is required for this scan. The extension reads dependency and MCP fil
 <tr>
 <td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;"><b>Chaintrap: Rescan workspace baseline</b></td>
 <td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;">Run the workspace inventory again</td>
+</tr>
+<tr>
+<td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;"><b>Chaintrap: Show workspace posture</b></td>
+<td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;">Focus the Workspace posture tree (also bound to the status bar)</td>
 </tr>
 <tr>
 <td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;"><b>Chaintrap: Review agent changes since last session</b></td>
