@@ -5,7 +5,7 @@ export type Ecosystem = "npm" | "pypi";
 
 export interface InventoryItem {
   key: string;
-  kind: "package" | "mcp" | "skill" | "rule";
+  kind: "package" | "mcp" | "skill" | "rule" | "coverage";
   path: string;
   hash: string;
   workspaceRoot?: string;
@@ -37,6 +37,10 @@ export interface Finding {
   unverifiedOnline?: boolean;
   /** True for known-bad or OSV MAL-*. False/undefined for CVE-only or informational. */
   malicious?: boolean;
+  /** Informational: only direct pins are checked because no lockfile is present. */
+  coverageNote?: boolean;
+  /** MCP server id from mcp.json when surface is mcp. */
+  mcpId?: string;
 }
 
 export interface BaselineSnapshot {

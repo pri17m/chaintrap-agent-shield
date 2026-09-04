@@ -19,6 +19,9 @@ export function liveInventoryKeyForFinding(f: Finding, liveItems: readonly Inven
   const name = (f.packageName || "").toLowerCase();
   const ver = f.version || "";
   return liveItems.find((i) => {
+    if (f.coverageNote) {
+      return i.kind === "coverage" && i.path === f.path && i.ecosystem === f.ecosystem;
+    }
     if (i.path !== f.path) {
       return false;
     }
@@ -26,7 +29,7 @@ export function liveInventoryKeyForFinding(f: Finding, liveItems: readonly Inven
       return false;
     }
     if (f.surface === "mcp") {
-      return i.kind === "mcp";
+      return i.kind === "mcp" && i.mcpId === f.mcpId;
     }
     if (f.surface === "package") {
       return i.kind === "package";
@@ -87,6 +90,7 @@ export function applyDeltaFindings(
   acks: Record<string, string>,
   livePaths: Set<string>,
   openRoots: readonly string[],
+  liveItems?: readonly InventoryItem[],
 ): Finding[] {
   const byId = new Map<string, Finding>();
   for (const f of existing) {
@@ -100,6 +104,18 @@ export function applyDeltaFindings(
   for (const f of byId.values()) {
     if (isOutOfScopeFinding(f, openRoots)) {
       out.push(f);
+      continue;
+    }
+    if (f.coverageNote && liveItems) {
+      const still = liveItems.some(
+        (i) => i.kind === "coverage" && i.path === f.path && i.ecosystem === f.ecosystem,
+      );
+      if (still) {
+        out.push(f);
+      }
+      continue;
+    }
+    if (liveItems && (f.surface === "mcp" || f.surface === "package") && !liveInventoryKeyForFinding(f, liveItems)) {
       continue;
     }
     if (livePaths.size === 0 || livePaths.has(f.path)) {

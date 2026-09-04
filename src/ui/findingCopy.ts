@@ -26,6 +26,26 @@ export function countUnackedHighCritical(findings: Finding[]): number {
 
 }
 
+/** Map a finding to Problems panel level. `skip` means do not emit a diagnostic. */
+export function diagnosticLevelForFinding(f: Finding): "error" | "warning" | "information" | "skip" {
+  if (f.acknowledged && (f.severity === "critical" || f.severity === "high")) {
+    return "skip";
+  }
+  if (f.severity === "critical" || f.severity === "high") {
+    return "error";
+  }
+  if (f.coverageNote) {
+    return "information";
+  }
+  if (f.severity === "info" && f.unverifiedOnline) {
+    return "warning";
+  }
+  if (f.severity === "info") {
+    return "skip";
+  }
+  return "warning";
+}
+
 
 
 export function shortPath(filePath: string): string {

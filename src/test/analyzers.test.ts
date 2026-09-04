@@ -9,6 +9,13 @@ import { analyzePackages, packageFindingCopy } from "../scanners/packageAnalyzer
 import { analyzeSkillOrRule, collectHeuristicHits } from "../scanners/skillHeuristics";
 import { analyzeItems } from "../scanners/itemAnalyzer";
 import {
+  npmNameFromPackagesKey,
+  parsePackageLockJson,
+  parsePipfileLockJson,
+  parseTomlPackageTables,
+  parseYarnBerryLockBody,
+} from "../scanners/lockfileParsers";
+import {
   inventoryWorkspaceRoot,
   MAX_SKILL_FILE_BYTES,
   parsePnpmPackageKey,
@@ -17,11 +24,11 @@ import {
 } from "../scanners/inventory";
 import { ApiKeyStore } from "../store/apiKeyStore";
 import { diffItems } from "../store/diffEngine";
-import { formatAckBody, needsAckPopup, countUnackedHighCritical, findingTreeCommand, statusBarText } from "../ui/findingCopy";
+import { formatAckBody, needsAckPopup, countUnackedHighCritical, findingTreeCommand, statusBarText, diagnosticLevelForFinding } from "../ui/findingCopy";
 import { ackViewModel } from "../ui/ackViewModel";
-import { groupDependencyFindings } from "../ui/findingGroups";
-import { applyDeltaFindings, replaceBaselineFindings, scopeFindingsForDisplay, skipKeysCoveredByFindings } from "../ui/findingMerge";
-import { removeMcpServerByPackage, removePackageJsonDependency, stripRequirementsLine } from "../store/uninstall";
+import { groupDependencyFindings, groupMcpFindings } from "../ui/findingGroups";
+import { applyDeltaFindings, liveInventoryKeyForFinding, replaceBaselineFindings, scopeFindingsForDisplay, skipKeysCoveredByFindings } from "../ui/findingMerge";
+import { removeMcpServerById, removeMcpServerByPackage, removePackageJsonDependency, stripRequirementsLine } from "../store/uninstall";
 import { homeWatchRoots } from "../watchers/homeWatchRoots";
 import type { Finding, InventoryItem } from "../types";
 
@@ -123,6 +130,49 @@ suite("knownBad + packageAnalyzer", () => {
     assert.strictEqual(hit!.title, "This PyPI package is vulnerable");
     assert.strictEqual(hit!.summary, "Python-Markdown has an Uncaught Exception");
     assert.match(hit!.message, /Description: Python-Markdown has an Uncaught Exception/);
+  });
+
+  test("MCP findings with the same pin get distinct ids per server", async () => {
+    const fakeFetch: typeof fetch = async (url, init) => {
+      if (String(init?.method || "GET").toUpperCase() === "POST") {
+        return {
+          ok: true,
+          json: async () => ({
+            results: [{ vulns: [{ id: "MAL-2024-1" }] }, { vulns: [{ id: "MAL-2024-1" }] }],
+          }),
+        } as Response;
+      }
+      return { ok: true, json: async () => ({ summary: "malicious package" }) } as Response;
+    };
+    const findings = await analyzePackages(
+      [
+        {
+          ecosystem: "npm",
+          name: "left-pad",
+          version: "1.3.0",
+          path: "/u/mcp.json",
+          surface: "mcp",
+          mcpId: "alpha",
+        },
+        {
+          ecosystem: "npm",
+          name: "left-pad",
+          version: "1.3.0",
+          path: "/u/mcp.json",
+          surface: "mcp",
+          mcpId: "beta",
+        },
+      ],
+      "baseline",
+      fakeFetch,
+    );
+    const ids = findings.map((x) => x.id);
+    assert.ok(ids.length >= 2);
+    assert.strictEqual(new Set(ids).size, ids.length);
+    assert.ok(ids.some((id) => id.includes("alpha:")));
+    assert.ok(ids.some((id) => id.includes("beta:")));
+    assert.ok(findings.some((x) => x.mcpId === "alpha"));
+    assert.ok(findings.some((x) => x.mcpId === "beta"));
   });
 });
 
@@ -335,6 +385,46 @@ suite("finding copy", () => {
     assert.deepStrictEqual(cmd.arguments, ["C:/repo/package.json"]);
     assert.ok(!JSON.stringify(cmd).includes("osv.dev"));
   });
+
+  test("tree command opens local mcp.json for MCP findings", () => {
+    const f: Finding = {
+      id: "mcp",
+      source: "baseline",
+      surface: "mcp",
+      severity: "critical",
+      title: "This npm package is malicious",
+      message: "Description: malware",
+      path: "C:/Users/me/.cursor/mcp.json",
+      mcpId: "postman",
+      packageName: "evil",
+      acknowledged: false,
+      createdAt: new Date().toISOString(),
+    };
+    const cmd = findingTreeCommand(f);
+    assert.strictEqual(cmd.command, "chaintrap.openFindingLocation");
+    assert.deepStrictEqual(cmd.arguments, ["C:/Users/me/.cursor/mcp.json"]);
+  });
+
+  test("coverage notes map to information diagnostics", () => {
+    const note: Finding = {
+      id: "c",
+      source: "baseline",
+      surface: "package",
+      severity: "info",
+      title: "Only direct pins are checked",
+      message: "Add a lockfile",
+      path: "/repo/package.json",
+      acknowledged: false,
+      createdAt: new Date().toISOString(),
+      coverageNote: true,
+    };
+    assert.strictEqual(diagnosticLevelForFinding(note), "information");
+    assert.strictEqual(needsAckPopup(note), false);
+    assert.strictEqual(
+      diagnosticLevelForFinding({ ...note, coverageNote: undefined, unverifiedOnline: undefined }),
+      "skip",
+    );
+  });
 });
 
 suite("inventory + diff", () => {
@@ -542,6 +632,37 @@ suite("findingMerge", () => {
     assert.strictEqual(covered.size, 0);
   });
 
+  test("liveInventoryKeyForFinding matches MCP by mcpId and path", () => {
+    const items: InventoryItem[] = [
+      {
+        key: "mcp:/mcp.json:a",
+        kind: "mcp",
+        path: "/mcp.json",
+        hash: "1",
+        packageName: "foo",
+        version: "1.0.0",
+        mcpId: "a",
+      },
+      {
+        key: "mcp:/mcp.json:b",
+        kind: "mcp",
+        path: "/mcp.json",
+        hash: "2",
+        packageName: "foo",
+        version: "1.0.0",
+        mcpId: "b",
+      },
+    ];
+    const finding = f({
+      surface: "mcp",
+      path: "/mcp.json",
+      packageName: "foo",
+      version: "1.0.0",
+      mcpId: "b",
+    });
+    assert.strictEqual(liveInventoryKeyForFinding(finding, items), "mcp:/mcp.json:b");
+  });
+
   test("delta prunes findings whose path left the live inventory", () => {
     const existing = [
       f({ id: "a", path: "/repo/package.json" }),
@@ -552,6 +673,83 @@ suite("findingMerge", () => {
       pruned.map((x) => x.id).sort(),
       ["a"],
     );
+  });
+
+  test("delta prunes MCP finding whose server left mcp.json", () => {
+    const existing = [
+      f({
+        id: "postman",
+        surface: "mcp",
+        path: "/mcp.json",
+        packageName: "@postman/postman-mcp-cli",
+        version: "1.0.4",
+        mcpId: "postman",
+      }),
+      f({
+        id: "lodash",
+        surface: "mcp",
+        path: "/mcp.json",
+        packageName: "lodash",
+        version: "4.17.20",
+        mcpId: "lodash",
+      }),
+    ];
+    const liveItems: InventoryItem[] = [
+      {
+        key: "mcp:/mcp.json:lodash",
+        kind: "mcp",
+        path: "/mcp.json",
+        hash: "h",
+        packageName: "lodash",
+        version: "4.17.20",
+        mcpId: "lodash",
+      },
+    ];
+    const pruned = applyDeltaFindings(existing, [], {}, new Set(["/mcp.json"]), ["/repo"], liveItems);
+    assert.deepStrictEqual(
+      pruned.map((x) => x.id),
+      ["lodash"],
+    );
+  });
+
+  test("delta prunes coverage notes when the lockfile appears", () => {
+    const existing: Finding[] = [
+      {
+        id: "cov",
+        source: "baseline",
+        surface: "package",
+        severity: "info",
+        title: "Only direct pins are checked",
+        message: "Add a lockfile",
+        path: "/repo/package.json",
+        ecosystem: "npm",
+        acknowledged: false,
+        workspaceRoot: "/repo",
+        createdAt: new Date().toISOString(),
+        coverageNote: true,
+      },
+    ];
+    const liveItems: InventoryItem[] = [
+      {
+        key: "pkg:npm:lodash@4.17.21:/repo/package-lock.json",
+        kind: "package",
+        path: "/repo/package-lock.json",
+        hash: "h",
+        workspaceRoot: "/repo",
+        packageName: "lodash",
+        version: "4.17.21",
+        ecosystem: "npm",
+      },
+    ];
+    const pruned = applyDeltaFindings(
+      existing,
+      [],
+      {},
+      new Set(["/repo/package.json", "/repo/package-lock.json"]),
+      ["/repo"],
+      liveItems,
+    );
+    assert.deepStrictEqual(pruned.map((x) => x.id), []);
   });
 
   test("scopeFindingsForDisplay hides other workspace roots", () => {
@@ -626,6 +824,125 @@ lodash@^4.17.21:
     const items = inventoryWorkspaceRoot(root);
     assert.ok(items.some((i) => i.packageName === "left-pad" && i.version === "1.3.0"));
     assert.ok(items.some((i) => i.packageName === "ms" && i.version === "2.1.3"));
+  });
+
+  test("nested npm lock key uses the last node_modules name", () => {
+    assert.strictEqual(npmNameFromPackagesKey("node_modules/express/node_modules/qs"), "qs");
+    assert.strictEqual(npmNameFromPackagesKey("node_modules/@scope/pkg"), "@scope/pkg");
+    assert.strictEqual(npmNameFromPackagesKey("packages/app"), null);
+    const pkgs = parsePackageLockJson(
+      JSON.stringify({
+        packages: {
+          "": { version: "1.0.0" },
+          "node_modules/express": { version: "4.18.2" },
+          "node_modules/express/node_modules/qs": { version: "6.11.0" },
+        },
+      }),
+    );
+    assert.ok(pkgs.some((p) => p.name === "qs" && p.version === "6.11.0"));
+    assert.ok(!pkgs.some((p) => p.name.includes("node_modules")));
+  });
+
+  test("lockfileVersion 1 walks nested dependencies", () => {
+    const pkgs = parsePackageLockJson(
+      JSON.stringify({
+        lockfileVersion: 1,
+        dependencies: {
+          express: {
+            version: "4.18.2",
+            dependencies: { qs: { version: "6.11.0" } },
+          },
+        },
+      }),
+    );
+    assert.ok(pkgs.some((p) => p.name === "express" && p.version === "4.18.2"));
+    assert.ok(pkgs.some((p) => p.name === "qs" && p.version === "6.11.0"));
+  });
+
+  test("npm lockfile wins over package.json directs", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "inv-lockwin-"));
+    fs.writeFileSync(
+      path.join(root, "package.json"),
+      JSON.stringify({ dependencies: { lodash: "^4.17.21" } }),
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(root, "package-lock.json"),
+      JSON.stringify({
+        packages: {
+          "": {},
+          "node_modules/lodash": { version: "4.17.21" },
+          "node_modules/lodash/node_modules/evil": { version: "1.0.0" },
+        },
+      }),
+      "utf8",
+    );
+    const items = inventoryWorkspaceRoot(root);
+    assert.ok(items.some((i) => i.packageName === "evil" && i.version === "1.0.0"));
+    assert.ok(!items.some((i) => i.path.endsWith("package.json") && i.kind === "package"));
+    assert.ok(!items.some((i) => i.kind === "coverage"));
+  });
+
+  test("Yarn Berry descriptors inventory transitives", () => {
+    const raw = `__metadata:
+  version: 6
+
+"lodash@npm:^4.17.21":
+  version: 4.17.21
+  resolution: "lodash@npm:4.17.21"
+
+"qs@npm:6.11.0":
+  version: 6.11.0
+  resolution: "qs@npm:6.11.0"
+`;
+    const pkgs = parseYarnBerryLockBody(raw);
+    assert.ok(pkgs.some((p) => p.name === "lodash" && p.version === "4.17.21"));
+    assert.ok(pkgs.some((p) => p.name === "qs" && p.version === "6.11.0"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "inv-berry-"));
+    fs.writeFileSync(path.join(root, "yarn.lock"), raw, "utf8");
+    const items = inventoryWorkspaceRoot(root);
+    assert.ok(items.some((i) => i.packageName === "qs" && i.version === "6.11.0"));
+  });
+
+  test("uv.lock poetry.lock and Pipfile.lock inventory PyPI pins", () => {
+    const toml = `[[package]]
+name = "requests"
+version = "2.31.0"
+`;
+    assert.deepStrictEqual(parseTomlPackageTables(toml), [{ name: "requests", version: "2.31.0" }]);
+    const pip = parsePipfileLockJson(
+      JSON.stringify({ default: { requests: { version: "==2.31.0" } }, develop: { pytest: { version: "==8.0.0" } } }),
+    );
+    assert.ok(pip.some((p) => p.name === "requests" && p.version === "2.31.0"));
+    assert.ok(pip.some((p) => p.name === "pytest" && p.version === "8.0.0"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "inv-uv-"));
+    fs.writeFileSync(path.join(root, "uv.lock"), toml, "utf8");
+    fs.writeFileSync(path.join(root, "requirements.txt"), "ignored==1.0.0\n", "utf8");
+    const items = inventoryWorkspaceRoot(root);
+    assert.ok(items.some((i) => i.packageName === "requests" && i.path.endsWith("uv.lock")));
+    assert.ok(!items.some((i) => i.packageName === "ignored"));
+    assert.ok(!items.some((i) => i.kind === "coverage"));
+  });
+
+  test("package.json without lockfile emits a coverage note", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "inv-cov-"));
+    fs.writeFileSync(
+      path.join(root, "package.json"),
+      JSON.stringify({ dependencies: { lodash: "4.17.21" } }),
+      "utf8",
+    );
+    const items = inventoryWorkspaceRoot(root);
+    assert.ok(items.some((i) => i.kind === "coverage" && i.ecosystem === "npm"));
+    const findings = await analyzeItems(items, "baseline", async () => ({
+      ok: true,
+      json: async () => ({ results: [{}] }),
+    } as Response));
+    const note = findings.find((f) => f.coverageNote);
+    assert.ok(note);
+    assert.strictEqual(note!.severity, "info");
+    const grouped = groupDependencyFindings(findings);
+    assert.ok(!grouped.malicious.some((f) => f.coverageNote));
+    assert.ok(!grouped.vulnerable.some((f) => f.coverageNote));
   });
 });
 
@@ -725,6 +1042,116 @@ suite("findingGroups", () => {
     assert.deepStrictEqual(grouped.malicious.map((x) => x.id), ["m"]);
     assert.deepStrictEqual(grouped.vulnerable.map((x) => x.id), ["v"]);
   });
+
+  test("malicious MCP finding is not in Dependencies groups", () => {
+    const mcp = f({
+      id: "mcp-mal",
+      surface: "mcp",
+      mcpId: "postman",
+      packageName: "evil",
+      malicious: true,
+      severity: "critical",
+      path: "/repo/.cursor/mcp.json",
+      title: "This npm package is malicious",
+    });
+    const dep = f({
+      id: "dep-mal",
+      surface: "package",
+      packageName: "evil",
+      malicious: true,
+      severity: "critical",
+      title: "This npm package is malicious",
+    });
+    const deps = groupDependencyFindings([mcp, dep]);
+    const mcps = groupMcpFindings([mcp, dep]);
+    assert.deepStrictEqual(
+      deps.malicious.map((x) => x.id),
+      ["dep-mal"],
+    );
+    assert.deepStrictEqual(
+      mcps.malicious.map((x) => x.id),
+      ["mcp-mal"],
+    );
+  });
+
+  test("lockfile finding is not in MCP groups", () => {
+    const lock = f({
+      id: "lock-vuln",
+      surface: "package",
+      packageName: "lodash",
+      malicious: false,
+      severity: "high",
+      path: "/repo/package-lock.json",
+      title: "This npm package is vulnerable",
+    });
+    const grouped = groupMcpFindings([lock]);
+    assert.deepStrictEqual(grouped.malicious, []);
+    assert.deepStrictEqual(grouped.vulnerable, []);
+    assert.deepStrictEqual(
+      groupDependencyFindings([lock]).vulnerable.map((x) => x.id),
+      ["lock-vuln"],
+    );
+  });
+
+  test("MCP config without inferred package stays out of both trees", () => {
+    const orphan = f({
+      id: "orphan",
+      surface: "mcp",
+      packageName: undefined,
+      mcpId: "stdio-only",
+      path: "/repo/.cursor/mcp.json",
+      malicious: true,
+      severity: "critical",
+    });
+    assert.deepStrictEqual(groupDependencyFindings([orphan]).malicious, []);
+    assert.deepStrictEqual(groupMcpFindings([orphan]).malicious, []);
+    assert.deepStrictEqual(groupMcpFindings([orphan]).vulnerable, []);
+    assert.deepStrictEqual(groupMcpFindings([orphan]).unpinned, []);
+  });
+
+  test("unpinned MCP finding is not in Dependencies groups", () => {
+    const unpinned = f({
+      id: "mcp-unpin",
+      surface: "mcp",
+      mcpId: "docs",
+      packageName: "chrome-devtools-mcp",
+      version: "unknown",
+      unverifiedOnline: true,
+      severity: "info",
+      path: "/repo/.cursor/mcp.json",
+      title: "Unpinned npm package chrome-devtools-mcp",
+    });
+    const deps = groupDependencyFindings([unpinned]);
+    const mcps = groupMcpFindings([unpinned]);
+    assert.deepStrictEqual(deps.malicious, []);
+    assert.deepStrictEqual(deps.vulnerable, []);
+    assert.deepStrictEqual(
+      mcps.unpinned.map((x) => x.id),
+      ["mcp-unpin"],
+    );
+    assert.deepStrictEqual(mcps.malicious, []);
+    assert.deepStrictEqual(mcps.vulnerable, []);
+  });
+
+  test("pinned malicious MCP is not unpinned", () => {
+    const mcp = f({
+      id: "mcp-mal",
+      surface: "mcp",
+      mcpId: "postman",
+      packageName: "@postman/postman-mcp-cli",
+      version: "1.0.4",
+      malicious: true,
+      severity: "critical",
+      path: "/repo/.cursor/mcp.json",
+      title: "This npm package is malicious",
+    });
+    const mcps = groupMcpFindings([mcp]);
+    assert.deepStrictEqual(
+      mcps.malicious.map((x) => x.id),
+      ["mcp-mal"],
+    );
+    assert.deepStrictEqual(mcps.unpinned, []);
+  });
 });
 
 suite("uninstall helpers", () => {
@@ -755,5 +1182,42 @@ suite("uninstall helpers", () => {
     const doc = JSON.parse(next) as { mcpServers: Record<string, unknown> };
     assert.ok(doc.mcpServers.docs);
     assert.strictEqual(doc.mcpServers.postman, undefined);
+  });
+
+  test("removeMcpServerById drops only that server id", () => {
+    const raw = JSON.stringify({
+      mcpServers: {
+        docs: { command: "npx", args: ["-y", "@postman/postman-mcp-cli@1.0.4"] },
+        postman: { command: "npx", args: ["-y", "@postman/postman-mcp-cli@1.0.4"] },
+      },
+    });
+    const { next, removed } = removeMcpServerById(raw, "postman");
+    assert.deepStrictEqual(removed, ["postman"]);
+    const doc = JSON.parse(next) as { mcpServers: Record<string, unknown> };
+    assert.ok(doc.mcpServers.docs);
+    assert.strictEqual(doc.mcpServers.postman, undefined);
+  });
+
+  test("removeMcpServerById writes valid JSON with compact args", () => {
+    const raw = `{
+  "mcpServers": {
+    "postman": {
+      "command": "npx",
+      "args": ["-y", "@postman/postman-mcp-cli@1.0.4"]
+    },
+    "lodash": {
+      "command": "npx",
+      "args": ["-y", "lodash@4.17.20"]
+    }
+  }
+}
+`;
+    const { next, removed } = removeMcpServerById(raw, "postman");
+    assert.deepStrictEqual(removed, ["postman"]);
+    const doc = JSON.parse(next) as { mcpServers: Record<string, { args: string[] }> };
+    assert.strictEqual(doc.mcpServers.postman, undefined);
+    assert.deepStrictEqual(doc.mcpServers.lodash.args, ["-y", "lodash@4.17.20"]);
+    assert.match(next, /"args": \["-y", "lodash@4\.17\.20"\]/);
+    assert.ok(!next.includes("\n        \"-y\""));
   });
 });

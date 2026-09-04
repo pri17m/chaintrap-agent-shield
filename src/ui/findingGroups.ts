@@ -1,7 +1,22 @@
 import type { Finding } from "../types";
 
+export function isManifestPackage(f: Finding): boolean {
+  return f.surface === "package" && Boolean(f.packageName);
+}
+
+export function isMcpServerFinding(f: Finding): boolean {
+  return f.surface === "mcp" && Boolean(f.packageName);
+}
+
 export function isPackageLike(f: Finding): boolean {
-  return (f.surface === "package" || f.surface === "mcp") && Boolean(f.packageName);
+  return isManifestPackage(f) || isMcpServerFinding(f);
+}
+
+export function isUnpinnedMcpFinding(f: Finding): boolean {
+  if (!isMcpServerFinding(f)) {
+    return false;
+  }
+  return !f.version || f.version === "unknown";
 }
 
 export function isMaliciousFinding(f: Finding): boolean {
@@ -24,12 +39,24 @@ export function isVulnerablePackageFinding(f: Finding): boolean {
   return f.severity !== "info" && f.severity !== "low";
 }
 
-export function groupDependencyFindings(findings: Finding[]): {
+function groupRisk(findings: Finding[], pred: (f: Finding) => boolean): { malicious: Finding[]; vulnerable: Finding[] } {
+  return {
+    malicious: findings.filter((f) => pred(f) && isMaliciousFinding(f)),
+    vulnerable: findings.filter((f) => pred(f) && isVulnerablePackageFinding(f)),
+  };
+}
+
+export function groupDependencyFindings(findings: Finding[]): { malicious: Finding[]; vulnerable: Finding[] } {
+  return groupRisk(findings, isManifestPackage);
+}
+
+export function groupMcpFindings(findings: Finding[]): {
   malicious: Finding[];
   vulnerable: Finding[];
+  unpinned: Finding[];
 } {
   return {
-    malicious: findings.filter(isMaliciousFinding),
-    vulnerable: findings.filter(isVulnerablePackageFinding),
+    ...groupRisk(findings, isMcpServerFinding),
+    unpinned: findings.filter(isUnpinnedMcpFinding),
   };
 }

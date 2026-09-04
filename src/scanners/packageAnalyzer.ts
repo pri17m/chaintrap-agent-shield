@@ -9,10 +9,23 @@ export interface PackageToAnalyze {
   path: string;
   workspaceRoot?: string;
   surface: "mcp" | "package";
+  mcpId?: string;
 }
 
 function findingId(source: FindingSource, pkg: PackageToAnalyze): string {
-  return `${source}:${pkg.surface}:${pkg.ecosystem}:${pkg.name}@${pkg.version}:${pkg.path}`;
+  const mcp = pkg.mcpId ? `${pkg.mcpId}:` : "";
+  return `${source}:${pkg.surface}:${pkg.ecosystem}:${pkg.name}@${pkg.version}:${mcp}${pkg.path}`;
+}
+
+function pkgFields(pkg: PackageToAnalyze): Pick<Finding, "path" | "packageName" | "version" | "ecosystem" | "workspaceRoot" | "mcpId"> {
+  return {
+    path: pkg.path,
+    packageName: pkg.name,
+    version: pkg.version,
+    ecosystem: pkg.ecosystem,
+    workspaceRoot: pkg.workspaceRoot,
+    mcpId: pkg.mcpId,
+  };
 }
 
 function ecoLabel(eco: Ecosystem): string {
@@ -64,13 +77,9 @@ export async function analyzePackages(
         title: copy.title,
         message: copy.message,
         summary: copy.summary,
-        path: pkg.path,
-        packageName: pkg.name,
-        version: pkg.version,
-        ecosystem: pkg.ecosystem,
+        ...pkgFields(pkg),
         advisoryUrl: kb.note.startsWith("http") ? kb.note : undefined,
         acknowledged: false,
-        workspaceRoot: pkg.workspaceRoot,
         createdAt: now,
         malicious: true,
       });
@@ -84,12 +93,8 @@ export async function analyzePackages(
           severity: "info",
           title: `Unpinned ${pkg.ecosystem} package ${pkg.name}`,
           message: "Version is unknown; OSV exact-version lookup skipped. Pin the version for a complete check.",
-          path: pkg.path,
-          packageName: pkg.name,
-          version: pkg.version,
-          ecosystem: pkg.ecosystem,
+          ...pkgFields(pkg),
           acknowledged: false,
-          workspaceRoot: pkg.workspaceRoot,
           createdAt: now,
           unverifiedOnline: true,
         });
@@ -158,12 +163,8 @@ export async function analyzePackages(
         severity: "info",
         title: `Could not verify ${pkg.name}@${pkg.version} online`,
         message: "OSV was unreachable. Package was not on the local known-bad list.",
-        path: pkg.path,
-        packageName: pkg.name,
-        version: pkg.version,
-        ecosystem: pkg.ecosystem,
+        ...pkgFields(pkg),
         acknowledged: false,
-        workspaceRoot: pkg.workspaceRoot,
         createdAt: now,
         unverifiedOnline: true,
       });
@@ -188,14 +189,10 @@ export async function analyzePackages(
       title: copy.title,
       message: copy.message,
       summary: copy.summary,
-      path: pkg.path,
-      packageName: pkg.name,
-      version: pkg.version,
-      ecosystem: pkg.ecosystem,
+      ...pkgFields(pkg),
       osvIds: cls.ids,
       advisoryUrl: cls.advisoryUrl,
       acknowledged: false,
-      workspaceRoot: pkg.workspaceRoot,
       createdAt: now,
       malicious: cls.malicious,
     });

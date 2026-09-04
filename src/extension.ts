@@ -16,17 +16,22 @@ export function activate(context: vscode.ExtensionContext): void {
   const apiKeys = new ApiKeyStore(context.secrets);
   const diagnostics = vscode.languages.createDiagnosticCollection("chaintrap");
   const problems = new ProblemsReporter(diagnostics);
-  const tree = new AgentActivityProvider();
+  const depTree = new AgentActivityProvider("package");
+  const mcpTree = new AgentActivityProvider("mcp");
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 80);
   status.command = "chaintrap.reviewDelta";
   status.text = "Chaintrap: starting";
   status.show();
 
-  const treeView = vscode.window.createTreeView("chaintrap.activity", {
-    treeDataProvider: tree,
+  const depView = vscode.window.createTreeView("chaintrap.activity", {
+    treeDataProvider: depTree,
     showCollapseAll: true,
   });
-  const controller = new ShieldController(store, problems, tree, status, treeView);
+  const mcpView = vscode.window.createTreeView("chaintrap.mcp", {
+    treeDataProvider: mcpTree,
+    showCollapseAll: true,
+  });
+  const controller = new ShieldController(store, problems, [depTree, mcpTree], status, [depView, mcpView]);
   const folders = () => vscode.workspace.workspaceFolders || [];
 
   void (async () => {
@@ -47,7 +52,8 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     diagnostics,
     status,
-    treeView,
+    depView,
+    mcpView,
     watchers,
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
       void controller.runBaseline(folders());
@@ -101,7 +107,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("chaintrap.uninstallMaliciousPackage", async (item?: FindingItem) => {
       const finding = item?.finding;
       if (!finding) {
-        void vscode.window.showInformationMessage("Right-click a malicious package in the Chaintrap view.");
+        void vscode.window.showInformationMessage("Right-click a malicious item in Dependencies or MCP servers.");
         return;
       }
       const ok = await uninstallMaliciousFinding(finding);

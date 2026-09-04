@@ -16,6 +16,8 @@ import { AgentActivityProvider } from "./agentActivityTree";
 
 import { countUnackedHighCritical, statusBarText } from "./findingCopy";
 
+import { isManifestPackage, isMcpServerFinding } from "./findingGroups";
+
 import { applyDeltaFindings, replaceBaselineFindings, scopeFindingsForDisplay, skipKeysCoveredByFindings } from "./findingMerge";
 
 import { ProblemsReporter } from "./problems";
@@ -66,11 +68,11 @@ export class ShieldController {
 
     private readonly problems: ProblemsReporter,
 
-    private readonly tree: AgentActivityProvider,
+    private readonly trees: AgentActivityProvider[],
 
     private readonly status: vscode.StatusBarItem,
 
-    private readonly treeView?: vscode.TreeView<unknown>,
+    private readonly treeViews: vscode.TreeView<unknown>[] = [],
 
   ) {}
 
@@ -92,21 +94,41 @@ export class ShieldController {
 
 
 
-  private updateBadge(findings: Finding[]): void {
+  private refreshTrees(shown: Finding[]): void {
 
-    if (!this.treeView) {
+    for (const tree of this.trees) {
 
-      return;
+      tree.refresh(shown);
 
     }
 
-    const count = countUnackedHighCritical(findings);
+  }
 
-    this.treeView.badge = count
 
-      ? { value: count, tooltip: `${count} unacknowledged high/critical finding${count === 1 ? "" : "s"}` }
 
-      : undefined;
+  private updateBadge(findings: Finding[]): void {
+
+    for (let i = 0; i < this.trees.length; i++) {
+
+      const view = this.treeViews[i];
+
+      if (!view) {
+
+        continue;
+
+      }
+
+      const subset = findings.filter(this.trees[i].surface === "mcp" ? isMcpServerFinding : isManifestPackage);
+
+      const count = countUnackedHighCritical(subset);
+
+      view.badge = count
+
+        ? { value: count, tooltip: `${count} unacknowledged high/critical finding${count === 1 ? "" : "s"}` }
+
+        : undefined;
+
+    }
 
   }
 
@@ -120,7 +142,7 @@ export class ShieldController {
 
     this.problems.refresh(shown);
 
-    this.tree.refresh(shown);
+    this.refreshTrees(shown);
 
     this.updateBadge(shown);
 
@@ -136,7 +158,7 @@ export class ShieldController {
 
       this.problems.refresh(shownAfter);
 
-      this.tree.refresh(shownAfter);
+      this.refreshTrees(shownAfter);
 
       this.updateBadge(shownAfter);
 
@@ -158,7 +180,7 @@ export class ShieldController {
 
     this.problems.refresh(shown);
 
-    this.tree.refresh(shown);
+    this.refreshTrees(shown);
 
     this.updateBadge(shown);
 
@@ -318,10 +340,12 @@ export class ShieldController {
       await this.store.setBaseline(this.store.snapshotFromItems("__user_config__", userItems));
 
       const livePaths = new Set<string>();
+      const liveItems: InventoryItem[] = [];
 
       for (const it of userItems) {
 
         livePaths.add(it.path);
+        liveItems.push(it);
 
       }
 
@@ -332,6 +356,7 @@ export class ShieldController {
         for (const it of items) {
 
           livePaths.add(it.path);
+          liveItems.push(it);
 
         }
 
@@ -347,7 +372,7 @@ export class ShieldController {
 
         // Still prune removed paths against live inventory
 
-        const pruned = applyDeltaFindings(this.store.getFindings(), [], this.store.getAcks(), livePaths, openRoots);
+        const pruned = applyDeltaFindings(this.store.getFindings(), [], this.store.getAcks(), livePaths, openRoots, liveItems);
 
         if (pruned.length !== this.store.getFindings().length) {
 
@@ -361,7 +386,7 @@ export class ShieldController {
 
       const findings = await analyzeItems(deltaItems, "delta");
 
-      const merged = applyDeltaFindings(this.store.getFindings(), findings, this.store.getAcks(), livePaths, openRoots);
+      const merged = applyDeltaFindings(this.store.getFindings(), findings, this.store.getAcks(), livePaths, openRoots, liveItems);
 
       await this.publish(merged, openRoots, true);
 

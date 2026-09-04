@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.1.20
+
+- Uninstall malicious npm/PyPI pins by editing the manifest only (no `npm`/`pip` spawn — fixes Windows `spawn EINVAL`)
+
+## 0.1.19
+
+- MCP uninstall writes compact valid `mcp.json` into the open editor (no broken indent after removing a server)
+- Drop MCP findings for servers that are no longer in the config when the file is still present
+
+## 0.1.18
+
+- Marketplace README: MCP servers tree + uninstall screenshots (replace old Dependencies-only shots)
+
+## 0.1.17
+
+- MCP servers view adds **Unpinned MCP servers** when the config has no package version
+- Listing leads on MCP-config pins vs project dependencies; detection-only (does not wrap npm/pip)
+
+## 0.1.16
+
+- Split the activity bar into **Dependencies** and **MCP servers** (malicious vs vulnerable in each)
+- MCP rows show the server id; uninstall removes that server, not every config with the same inferred package
+
+## 0.1.15
+
+- Scan locked transitives (npm lock v1/nested names, Yarn Berry, uv.lock, poetry.lock, Pipfile.lock)
+- Informational note when a manifest has no lockfile (direct pins only)
+
 ## 0.1.14
 
 - Listing copy: malware-protection value; drop capability-gap table and intel internals

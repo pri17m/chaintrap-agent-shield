@@ -2,8 +2,18 @@ import * as crypto from "crypto";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import type { InventoryItem } from "../types";
+import type { Ecosystem, InventoryItem } from "../types";
+import {
+  parsePackageLockJson,
+  parsePipfileLockJson,
+  parsePnpmLockBody,
+  parsePnpmPackageKey,
+  parseTomlPackageTables,
+  parseYarnLockBody,
+} from "./lockfileParsers";
 import { inferredFromMcpServer, parseMcpConfigJson } from "./mcpParser";
+
+export { parsePnpmPackageKey, parseYarnLockBody };
 
 /** Skip loading skill/rule bodies larger than this (bytes). */
 export const MAX_SKILL_FILE_BYTES = 256 * 1024;
@@ -111,44 +121,45 @@ function parsePackageJson(filePath: string, workspaceRoot: string, items: Invent
   }
 }
 
+function addCoverageNote(
+  items: InventoryItem[],
+  workspaceRoot: string,
+  filePath: string,
+  ecosystem: Ecosystem,
+): void {
+  const key = `coverage:${ecosystem}-lock:${workspaceRoot}`;
+  items.push({
+    key,
+    kind: "coverage",
+    path: filePath,
+    hash: sha256(key),
+    workspaceRoot,
+    ecosystem,
+  });
+}
+
+function addLockedPackages(
+  items: InventoryItem[],
+  workspaceRoot: string,
+  filePath: string,
+  ecosystem: Ecosystem,
+  pkgs: Array<{ name: string; version: string }>,
+): void {
+  for (const p of pkgs) {
+    addPackage(items, workspaceRoot, filePath, ecosystem, p.name, p.version);
+  }
+}
+
 function parsePackageLock(filePath: string, workspaceRoot: string, items: InventoryItem[]): void {
   const raw = readText(filePath);
   if (!raw) {
     return;
   }
   try {
-    const doc = JSON.parse(raw) as { packages?: Record<string, { version?: string }> };
-    for (const [pkgPath, meta] of Object.entries(doc.packages || {})) {
-      if (!pkgPath || pkgPath === "") {
-        continue;
-      }
-      const name = pkgPath.replace(/^node_modules\//, "");
-      addPackage(items, workspaceRoot, filePath, "npm", name, meta.version || "unknown");
-    }
+    addLockedPackages(items, workspaceRoot, filePath, "npm", parsePackageLockJson(raw));
   } catch {
     /* ignore */
   }
-}
-
-/** Extract name@version from pnpm packages keys like `/lodash@4.17.21` or `@scope/pkg@1.0.0`. */
-export function parsePnpmPackageKey(key: string): { name: string; version: string } | null {
-  const k = key.trim().replace(/^['"]|['"]$/g, "");
-  if (!k || k === "." || k.startsWith("file:")) {
-    return null;
-  }
-  const body = k.startsWith("/") ? k.slice(1) : k;
-  if (body.startsWith("@")) {
-    const idx = body.lastIndexOf("@");
-    if (idx <= 0) {
-      return null;
-    }
-    return { name: body.slice(0, idx).toLowerCase(), version: body.slice(idx + 1) || "unknown" };
-  }
-  const idx = body.lastIndexOf("@");
-  if (idx <= 0) {
-    return null;
-  }
-  return { name: body.slice(0, idx).toLowerCase(), version: body.slice(idx + 1) || "unknown" };
 }
 
 function parsePnpmLock(filePath: string, workspaceRoot: string, items: InventoryItem[]): void {
@@ -156,55 +167,7 @@ function parsePnpmLock(filePath: string, workspaceRoot: string, items: Inventory
   if (!raw) {
     return;
   }
-  // Prefer JSON-like packages: block keys; also accept importers-less classic YAML keys under packages:
-  const packagesIdx = raw.search(/^packages:\s*$/m);
-  if (packagesIdx < 0) {
-    return;
-  }
-  const section = raw.slice(packagesIdx);
-  const keyRe = /^\s{2}('([^']+)'|"([^"]+)"|(\/[^\s:]+|[^\s:][^:]*)):\s*$/gm;
-  let m: RegExpExecArray | null;
-  while ((m = keyRe.exec(section))) {
-    const key = m[2] || m[3] || m[4] || "";
-    const parsed = parsePnpmPackageKey(key);
-    if (parsed) {
-      addPackage(items, workspaceRoot, filePath, "npm", parsed.name, parsed.version);
-    }
-  }
-}
-
-/** Yarn classic lock: `name@version:` then `  version "x.y.z"`. */
-export function parseYarnLockBody(raw: string): Array<{ name: string; version: string }> {
-  const out: Array<{ name: string; version: string }> = [];
-  const lines = raw.split(/\r?\n/);
-  let pendingNames: string[] = [];
-  for (const line of lines) {
-    if (!line.trim() || line.startsWith("#")) {
-      continue;
-    }
-    const header = line.match(/^"?(@?[^@\s"]+)@[^:]+:"?\s*$/);
-    if (header && !line.startsWith(" ")) {
-      // Multi-key headers: "a@1, b@1:"
-      pendingNames = line
-        .replace(/:$/, "")
-        .split(",")
-        .map((part) => {
-          const p = part.trim().replace(/^"|"$/g, "");
-          const at = p.startsWith("@") ? p.lastIndexOf("@") : p.indexOf("@");
-          return at > 0 ? p.slice(0, at).toLowerCase() : "";
-        })
-        .filter(Boolean);
-      continue;
-    }
-    const ver = line.match(/^\s+version\s+"([^"]+)"/);
-    if (ver && pendingNames.length) {
-      for (const name of pendingNames) {
-        out.push({ name, version: ver[1] });
-      }
-      pendingNames = [];
-    }
-  }
-  return out;
+  addLockedPackages(items, workspaceRoot, filePath, "npm", parsePnpmLockBody(raw));
 }
 
 function parseYarnLock(filePath: string, workspaceRoot: string, items: InventoryItem[]): void {
@@ -212,8 +175,26 @@ function parseYarnLock(filePath: string, workspaceRoot: string, items: Inventory
   if (!raw) {
     return;
   }
-  for (const { name, version } of parseYarnLockBody(raw)) {
-    addPackage(items, workspaceRoot, filePath, "npm", name, version);
+  addLockedPackages(items, workspaceRoot, filePath, "npm", parseYarnLockBody(raw));
+}
+
+function parseTomlLock(filePath: string, workspaceRoot: string, items: InventoryItem[]): void {
+  const raw = readText(filePath);
+  if (!raw) {
+    return;
+  }
+  addLockedPackages(items, workspaceRoot, filePath, "pypi", parseTomlPackageTables(raw));
+}
+
+function parsePipfileLock(filePath: string, workspaceRoot: string, items: InventoryItem[]): void {
+  const raw = readText(filePath);
+  if (!raw) {
+    return;
+  }
+  try {
+    addLockedPackages(items, workspaceRoot, filePath, "pypi", parsePipfileLockJson(raw));
+  } catch {
+    /* ignore */
   }
 }
 
@@ -335,25 +316,42 @@ export function userConfigPaths(): {
 export function inventoryWorkspaceRoot(workspaceRoot: string): InventoryItem[] {
   const items: InventoryItem[] = [];
   const pkgJson = path.join(workspaceRoot, "package.json");
-  if (fs.existsSync(pkgJson)) {
-    parsePackageJson(pkgJson, workspaceRoot, items);
-  }
   const lock = path.join(workspaceRoot, "package-lock.json");
-  if (fs.existsSync(lock)) {
-    parsePackageLock(lock, workspaceRoot, items);
-  }
   const pnpm = path.join(workspaceRoot, "pnpm-lock.yaml");
-  if (fs.existsSync(pnpm)) {
-    parsePnpmLock(pnpm, workspaceRoot, items);
-  }
   const yarn = path.join(workspaceRoot, "yarn.lock");
-  if (fs.existsSync(yarn)) {
-    parseYarnLock(yarn, workspaceRoot, items);
+  const hasNpmLock = fs.existsSync(lock) || fs.existsSync(pnpm) || fs.existsSync(yarn);
+  if (hasNpmLock) {
+    if (fs.existsSync(lock)) {
+      parsePackageLock(lock, workspaceRoot, items);
+    }
+    if (fs.existsSync(pnpm)) {
+      parsePnpmLock(pnpm, workspaceRoot, items);
+    }
+    if (fs.existsSync(yarn)) {
+      parseYarnLock(yarn, workspaceRoot, items);
+    }
+  } else if (fs.existsSync(pkgJson)) {
+    parsePackageJson(pkgJson, workspaceRoot, items);
+    addCoverageNote(items, workspaceRoot, pkgJson, "npm");
   }
-  // uv.lock watched for deltas but not parsed yet (deferred — TOML)
+  const uv = path.join(workspaceRoot, "uv.lock");
+  const poetry = path.join(workspaceRoot, "poetry.lock");
+  const pipfile = path.join(workspaceRoot, "Pipfile.lock");
   const req = path.join(workspaceRoot, "requirements.txt");
-  if (fs.existsSync(req)) {
+  const hasPyLock = fs.existsSync(uv) || fs.existsSync(poetry) || fs.existsSync(pipfile);
+  if (hasPyLock) {
+    if (fs.existsSync(uv)) {
+      parseTomlLock(uv, workspaceRoot, items);
+    }
+    if (fs.existsSync(poetry)) {
+      parseTomlLock(poetry, workspaceRoot, items);
+    }
+    if (fs.existsSync(pipfile)) {
+      parsePipfileLock(pipfile, workspaceRoot, items);
+    }
+  } else if (fs.existsSync(req)) {
     parseRequirements(req, workspaceRoot, items);
+    addCoverageNote(items, workspaceRoot, req, "pypi");
   }
   const mcpWs = path.join(workspaceRoot, ".cursor", "mcp.json");
   if (fs.existsSync(mcpWs)) {

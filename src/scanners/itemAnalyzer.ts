@@ -22,8 +22,35 @@ export function packagesFromItems(items: InventoryItem[]): PackageToAnalyze[] {
         path: item.path,
         workspaceRoot: item.workspaceRoot,
         surface: "mcp",
+        mcpId: item.mcpId,
       });
     }
+  }
+  return out;
+}
+
+function coverageFindings(items: InventoryItem[], source: FindingSource): Finding[] {
+  const now = new Date().toISOString();
+  const out: Finding[] = [];
+  for (const item of items) {
+    if (item.kind !== "coverage" || !item.ecosystem) {
+      continue;
+    }
+    const lockHint = item.ecosystem === "pypi" ? "uv.lock, poetry.lock, or Pipfile.lock" : "package-lock.json, pnpm-lock.yaml, or yarn.lock";
+    out.push({
+      id: `${source}:coverage:${item.ecosystem}:${item.path}`,
+      source,
+      surface: "package",
+      severity: "info",
+      title: "Only direct pins are checked",
+      message: `Add a lockfile (${lockHint}) to include transitive dependencies.`,
+      path: item.path,
+      ecosystem: item.ecosystem,
+      acknowledged: false,
+      workspaceRoot: item.workspaceRoot,
+      createdAt: now,
+      coverageNote: true,
+    });
   }
   return out;
 }
@@ -45,5 +72,6 @@ export async function analyzeItems(
 ): Promise<Finding[]> {
   const skip = options?.skipKeys;
   const toAnalyze = skip ? items.filter((i) => !skip.has(i.key)) : items;
-  return analyzePackages(packagesFromItems(toAnalyze), source, fetchImpl);
+  const pkgs = await analyzePackages(packagesFromItems(toAnalyze), source, fetchImpl);
+  return [...pkgs, ...coverageFindings(toAnalyze, source)];
 }

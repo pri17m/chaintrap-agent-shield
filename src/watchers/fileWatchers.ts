@@ -12,6 +12,8 @@ export function createWatchers(onChange: () => void): vscode.Disposable {
     "**/pnpm-lock.yaml",
     "**/yarn.lock",
     "**/uv.lock",
+    "**/poetry.lock",
+    "**/Pipfile.lock",
     "**/requirements.txt",
     "**/.cursor/mcp.json",
     "**/.cursor/skills/**",
