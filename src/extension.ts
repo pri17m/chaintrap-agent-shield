@@ -109,11 +109,6 @@ export function activate(context: vscode.ExtensionContext): void {
         await controller.runBaseline(folders());
       }
     }),
-    vscode.commands.registerCommand("chaintrap.installGuard", () => {
-      void vscode.env.openExternal(
-        vscode.Uri.parse("https://github.com/pri17m/extension-analyser/blob/main/docs/CHAINTRAP_GUARD.md"),
-      );
-    }),
     vscode.commands.registerCommand("chaintrap.scanInstalledExtensions", async () => {
       const cfg = vscode.workspace.getConfiguration("chaintrap");
       const apiKey = await apiKeys.get();

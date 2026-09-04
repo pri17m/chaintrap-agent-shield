@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.11
+
+- Remove install-protection docs command and listing copy (not shipping)
+
 ## 0.1.10
 
 - Marketplace README uses only the Dependencies tree and activity-bar badge screenshots
@@ -18,7 +22,7 @@
 - Dependencies view groups **Malicious** vs **Vulnerable** packages (baseline/delta stays on the row)
 - Right-click Uninstall on malicious items: `npm uninstall`, `pip uninstall` + requirements strip, or remove MCP server from `mcp.json`
 - Finding records a `malicious` flag (known-bad / OSV MAL-*)
-- Blocking installs remains Chaintrap Guard (separate download)
+- Uninstall from the Dependencies tree (does not intercept `npm` / `pip` at install time)
 
 ## 0.1.6
 

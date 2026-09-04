@@ -43,7 +43,7 @@ export class GroupItem extends vscode.TreeItem {
     super(label, vscode.TreeItemCollapsibleState.Expanded);
     this.contextValue = kind === "malicious" ? "maliciousGroup" : "vulnerableGroup";
     if (kind === "malicious") {
-      this.tooltip = "Known-bad or OSV malware. Right-click a package to uninstall. Blocking installs requires Chaintrap Guard.";
+      this.tooltip = "Known-bad or OSV malware. Right-click a package to uninstall.";
     }
   }
 }

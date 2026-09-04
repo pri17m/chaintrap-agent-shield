@@ -14,7 +14,7 @@ Living notes for listing `pri17m.chaintrap-agent-shield`. Marketing claims must 
 | Screenshots | 3 | PNG assets missing from tree; captions described old skill UI |
 | Trust | 6 | PRIVACY.md exists; Marketplace copy was thin |
 | UX | 7 | Real product (tree, ack webview, uninstall) |
-| Conversion | 4 | Unclear install + oversell risk vs Guard |
+| Conversion | 4 | Unclear install vs overselling runtime blocking |
 | Differentiation | 6 | Unique: in-IDE OSV+denylist on agent/MCP **packages**, not tool-YARA |
 
 ## B. Feature inventory
@@ -36,7 +36,6 @@ Living notes for listing `pri17m.chaintrap-agent-shield`. Marketing claims must 
 | Uninstall npm/pip/MCP entry | `uninstallFlow.ts` | Yes |
 | Problems + status bar | `problems.ts`, `findingCopy.ts` | Yes |
 | Optional extension-id deep scan | `chaintrapClient.ts` | Yes, as **optional** |
-| Guard docs command | `chaintrap.installGuard` | Yes, as **companion**, not this binary |
 
 ### Partial — describe narrowly
 
@@ -88,7 +87,7 @@ Week 2: Short post: “What `npx` in mcp.json actually installs” + OSV.
 Week 3: Cursor/MCP Discord/forums — no spam; answer “how do I see agent deps”.  
 Week 4: Compare-page blog vs Cisco/Snyk **without** claiming their features.
 
-100 installs: listing + one technical post. 500–1k: ecosystem mentions + screenshots. 10k: needs Guard story + SEO articles (see below), not Marketplace copy alone.
+100 installs: listing + one technical post. 500–1k: ecosystem mentions + screenshots. 10k: needs SEO articles (see below), not Marketplace copy alone.
 
 ## Content titles (educate first)
 
@@ -96,7 +95,7 @@ Week 4: Compare-page blog vs Cisco/Snyk **without** claiming their features.
 2. OSV MAL-* vs CVE in AI-agent lockfiles — osv malware  
 3. Why `^` in package.json is not the version OSV checks — supply chain  
 4. mcp.json npx -y and known-bad versions — MCP server security  
-5. Visibility vs blocking: Shield vs Guard — ai agent security  
+5. Visibility vs blocking: what this extension does not intercept — ai agent security  
 
 ## Icon spec (if redesigned later)
 

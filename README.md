@@ -12,7 +12,7 @@
 
 *Chaintrap → Dependencies: malicious packages vs vulnerable packages.*
 
-> This extension **flags** packages. It does **not** intercept `npm install` / `pip install` or stop `postinstall` scripts. Blocking installs is a separate product ([Chaintrap Guard](https://github.com/pri17m/extension-analyser/blob/main/docs/CHAINTRAP_GUARD.md)).
+> This extension **flags** packages. It does **not** intercept `npm install` / `pip install` or stop `postinstall` scripts.
 
 ---
 
@@ -114,7 +114,6 @@ No API key is required for package/MCP checks.
 | **Chaintrap: Open finding location** | Open the manifest/config file |
 | **Chaintrap: Set / Clear API key** | SecretStorage for optional deep VS Code extension scans |
 | **Chaintrap: Deep-scan installed VS Code extensions** | Optional; sends **extension id only** to `chaintrap.apiBase` |
-| **Chaintrap: Open Guard install-protection docs** | Companion CLI that can block installs |
 
 There is **no** Chaintrap CLI inside this extension.
 
@@ -145,7 +144,7 @@ Full detail: [PRIVACY.md](PRIVACY.md).
 
 ## Who it is for
 
-Developers and security reviewers using **Cursor / VS Code / Claude Code** who want an in-editor check of **what packages and MCP-inferred dependencies** are pinned—not a replacement for Guard, Snyk, or MCP protocol scanners.
+Developers and security reviewers using **Cursor / VS Code / Claude Code** who want an in-editor check of **what packages and MCP-inferred dependencies** are pinned—not a replacement for Snyk or MCP protocol scanners.
 
 ---
 
