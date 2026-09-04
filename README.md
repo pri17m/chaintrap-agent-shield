@@ -4,6 +4,14 @@
 
 [Install from the Marketplace](https://marketplace.visualstudio.com/items?itemName=pri17m.chaintrap-agent-shield) · [GitHub](https://github.com/pri17m/chaintrap-agent-shield) · [Privacy](PRIVACY.md)
 
+![Unacknowledged high/critical findings on the Chaintrap activity-bar badge](media/screenshots/badge-findings.png)
+
+*Activity-bar badge: unacknowledged high/critical findings in the open workspace.*
+
+![Dependencies view: malicious vs vulnerable packages](media/screenshots/dependencies-tree.png)
+
+*Chaintrap → Dependencies: malicious packages vs vulnerable packages.*
+
 > This extension **flags** packages. It does **not** intercept `npm install` / `pip install` or stop `postinstall` scripts. Blocking installs is a separate product ([Chaintrap Guard](https://github.com/pri17m/extension-analyser/blob/main/docs/CHAINTRAP_GUARD.md)).
 
 ---

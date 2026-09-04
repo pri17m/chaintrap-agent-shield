@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.10
+
+- Marketplace README uses only the Dependencies tree and activity-bar badge screenshots
+
 ## 0.1.9
 
 - High/critical ack uses a branded **Chaintrap finding** webview (not the Visual Studio Code error dialog)

@@ -14,6 +14,10 @@ scripts/**
 fixtures/**
 DOGFOOD.md
 media/screenshots/*.html
+media/screenshots/ack.png
+media/screenshots/activity.png
+media/screenshots/mcp.png
+media/screenshots/agent-activity-ack.png
 .code-review-graph/**
 .gitnexus/**
 .specify/**
