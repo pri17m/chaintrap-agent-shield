@@ -97,6 +97,6 @@ Week 4: Compare-page blog vs Cisco/Snyk **without** claiming their features.
 4. mcp.json npx -y and known-bad versions — MCP server security  
 5. Visibility vs blocking: what this extension does not intercept — ai agent security  
 
-## Icon spec (if redesigned later)
+## Icon spec
 
-128×128 PNG, `#0B1220` field, one chain-link or snare (not a checkmark shield). Must read at 24px activity bar. Current `media/icon.png` is a teal shield+check—fine for now, weak differentiation.
+128×128 PNG (`media/icon.png`), `#081122` field, teal shield with interlocking chain links. Activity bar: `media/activitybar.svg`.

@@ -13,6 +13,7 @@ scripts/**
 *.vsix
 fixtures/**
 DOGFOOD.md
+docs/**
 media/screenshots/*.html
 media/screenshots/ack.png
 media/screenshots/activity.png

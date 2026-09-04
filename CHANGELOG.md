@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.14
+
+- Listing copy: malware-protection value; drop capability-gap table and intel internals
+
+## 0.1.13
+
+- Marketplace listing copy: product outcomes only (no intel-pipeline details); typography on the listing README
+
+## 0.1.12
+
+- Marketplace and activity-bar icon: shield with interlocking chain links
+
 ## 0.1.11
 
 - Remove install-protection docs command and listing copy (not shipping)

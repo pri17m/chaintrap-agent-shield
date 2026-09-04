@@ -1,176 +1,125 @@
-# Chaintrap Agent Shield
+<div align="center">
 
-**AI-coding security in the editor.** See what Cursor, Claude Code, and Copilot installed: scan open workspaces and MCP configs for **malicious** and **vulnerable** npm/PyPI packages—then review, acknowledge, or uninstall.
+<img src="media/icon.png" width="112" height="112" alt="Chaintrap Agent Shield">
 
-[Install from the Marketplace](https://marketplace.visualstudio.com/items?itemName=pri17m.chaintrap-agent-shield) · [GitHub](https://github.com/pri17m/chaintrap-agent-shield) · [Privacy](PRIVACY.md)
+<h1 style="font-family: Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif; font-weight: 700; letter-spacing: -0.03em; margin: 0.4em 0 0.25em;">Chaintrap Agent Shield</h1>
 
-![Unacknowledged high/critical findings on the Chaintrap activity-bar badge](media/screenshots/badge-findings.png)
+<p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; font-size: 1.15em; line-height: 1.45; max-width: 38em; margin: 0 auto 1em;">
+<b>Stop malware dependencies from hiding in your editor.</b><br>
+When Cursor, Claude Code, or Copilot adds a package, Chaintrap flags it if it is malicious or vulnerable—so you can uninstall it before it stays in the project.
+</p>
 
-*Activity-bar badge: unacknowledged high/critical findings in the open workspace.*
+<p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;">
+<a href="https://marketplace.visualstudio.com/items?itemName=pri17m.chaintrap-agent-shield"><b>Marketplace</b></a>
+&nbsp;·&nbsp;
+<a href="https://github.com/pri17m/chaintrap-agent-shield"><b>GitHub</b></a>
+&nbsp;·&nbsp;
+<a href="PRIVACY.md"><b>Privacy</b></a>
+</p>
 
-![Dependencies view: malicious vs vulnerable packages](media/screenshots/dependencies-tree.png)
+</div>
 
-*Chaintrap → Dependencies: malicious packages vs vulnerable packages.*
+<p align="center"><img src="media/screenshots/badge-findings.png" alt="Unacknowledged high and critical findings on the Chaintrap activity-bar badge"></p>
 
-> This extension **flags** packages. It does **not** intercept `npm install` / `pip install` or stop `postinstall` scripts.
+<p align="center" style="font-family: Palatino, 'Palatino Linotype', Georgia, serif; font-style: italic;">A badge when something dangerous is sitting in the open workspace.</p>
 
----
+<p align="center"><img src="media/screenshots/dependencies-tree.png" alt="Dependencies view with malicious and vulnerable packages"></p>
 
-## Why install this?
-
-Agents (Cursor, Claude Code, Copilot) can add MCP servers and dependencies without a human noticing. Manually grepping `mcp.json` and lockfiles does not tell you whether `nx@20.9.0` is on a malware denylist or whether OSV has a `MAL-*` advisory.
-
-Chaintrap inventories those files, checks **exact versions** against [OSV](https://osv.dev) and a bundled known-bad list, and shows results in the editor.
-
-| You get | You do not get |
-|---------|----------------|
-| Visibility on npm/PyPI pins and MCP-inferred packages | Prompt-injection or skill-content scanning (inventory only) |
-| Malicious vs vulnerable grouping | Live MCP protocol fuzzing or YARA on server source |
-| Ack + uninstall for flagged malware pins | Blocking `npm`/`pip` at runtime |
-
----
-
-## Features
-
-**MCP package inference**  
-Reads workspace and user `mcp.json`, infers npm/PyPI packages from `npx` / `pip` / `-m` command lines, and scans those versions the same way as `package.json`.
-
-**OSV + known-bad**  
-Queries `api.osv.dev` for `MAL-*` (malicious) and CVE/GHSA (vulnerable). A local denylist still flags known campaigns if OSV is unreachable.
-
-**Dependencies view**  
-Activity-bar tree: **Malicious packages** and **Vulnerable packages**. Click opens the manifest. Right-click **Uninstall** on malicious items (`npm uninstall`, `pip uninstall` + `requirements.txt`, or remove an MCP server entry).
-
-**Baseline and delta**  
-On folder open, full inventory. File watchers then analyze **new or changed** items. Command: **Chaintrap: Review agent changes since last session**.
-
-**Acknowledge high/critical**  
-A **Chaintrap finding** panel (not a generic VS Code error box) for unacked high/critical items. “I understand the risk” is stored in `globalState`.
-
-**Problems + status bar**  
-Findings also appear in Problems. Offline packages not on the denylist are marked *Could not verify online*—not treated as safe.
+<p align="center" style="font-family: Palatino, 'Palatino Linotype', Georgia, serif; font-style: italic;">Malicious packages vs vulnerable packages—open the file or uninstall from here.</p>
 
 ---
 
-## Example finding
+<h2 style="font-family: Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif; font-weight: 700;">Why install this?</h2>
 
-**Severity:** critical  
-**Finding:** This npm package is malicious  
-**Package:** `nx@20.9.0` (known-bad / OSV `MAL-*` when listed)
+<p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
+AI coding agents install npm and PyPI packages for you. A malicious version can steal credentials, run extra scripts, or quietly stay in the lockfile after the chat is over.
+</p>
 
-**What Chaintrap detected:** The pinned version matches the bundled denylist (s1ngularity campaign) and/or OSV malware IDs for that exact `name@version`.
+<p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
+<b>Chaintrap Agent Shield watches the workspace</b> and tells you when a dependency is malware or known-vulnerable—including packages pulled in through MCP configs, not only <code>package.json</code>.
+</p>
 
-**Why it matters:** Compromised installer versions have shipped postinstall telemetry/exfil. Seeing the pin in `package.json` is not the same as knowing it is denylisted.
-
-**In-product actions:** Open location, open OSV advisory (if present), acknowledge, or uninstall from the tree.  
-**General guidance (not a runtime block):** Do not `npm install` that pin. Prefer a clean version and a lockfile.
-
----
-
-## How it works
-
-```text
-Open folder / file change
-        ↓
-Inventory manifests, lockfiles, MCP configs
-        ↓
-Infer packages (npm / PyPI / MCP command lines)
-        ↓
-Known-bad (local) + OSV querybatch (name, version, ecosystem)
-        ↓
-Findings → Dependencies tree, Problems, ack panel
-        ↓
-Review, acknowledge, or uninstall
-```
-
-Skill and rule files are **listed in inventory** only. Heuristic content scanning is off (false positives).
+<p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
+You see it in the editor. You can open the pin, acknowledge the risk, or uninstall it in one step.
+</p>
 
 ---
 
-## Install
+<h2 style="font-family: Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif; font-weight: 700;">Features</h2>
 
-### From VS Code / Cursor Marketplace
+<p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
+<b>Catch malware in the project.</b> Scans your workspace and flags a dependency if it is malicious or vulnerable.
+</p>
 
-Search **Chaintrap Agent Shield** or install `pri17m.chaintrap-agent-shield`.
+<p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
+<b>Cover what agents actually add.</b> Project dependencies and packages referenced from MCP server configs.
+</p>
 
-### First scan
+<p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
+<b>Act from the tree.</b> Malicious vs vulnerable lists. Click to open the file. Right-click to uninstall malware pins.
+</p>
 
-1. Open a folder (status bar: `Chaintrap: scanning workspace…`).
-2. Open the **Chaintrap** activity bar → **Dependencies**.
-3. Optional: **Chaintrap: Rescan workspace baseline** from the Command Palette.
+<p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
+<b>Keep watching.</b> Full check when you open a folder. Then new and changed items are reviewed as the agent keeps working.
+</p>
 
-No API key is required for package/MCP checks.
-
----
-
-## Commands
-
-| Command | What it does |
-|---------|----------------|
-| **Chaintrap: Rescan workspace baseline** | Re-inventory and re-analyze |
-| **Chaintrap: Review agent changes since last session** | Delta findings since this window opened |
-| **Chaintrap: Acknowledge high/critical finding** | Pick an unacked finding |
-| **Chaintrap: Uninstall malicious package** | From the Dependencies context menu |
-| **Chaintrap: Open finding location** | Open the manifest/config file |
-| **Chaintrap: Set / Clear API key** | SecretStorage for optional deep VS Code extension scans |
-| **Chaintrap: Deep-scan installed VS Code extensions** | Optional; sends **extension id only** to `chaintrap.apiBase` |
-
-There is **no** Chaintrap CLI inside this extension.
+<p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
+<b>Make the risk explicit.</b> High and critical findings open a Chaintrap panel so you confirm you understand before you move on.
+</p>
 
 ---
 
-## What is watched
+<h2 style="font-family: Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif; font-weight: 700;">Get started</h2>
 
-| Surface | Paths | Analyzed for findings? |
-|---------|--------|------------------------|
-| Dependencies | `package.json`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `requirements.txt` | Yes (exact versions). `uv.lock` is watched only |
-| MCP | `.cursor/mcp.json`, `~/.cursor/mcp.json`, VS Code User `mcp.json` | Yes — inferred packages |
-| Skills / rules | `.cursor/skills`, `.claude/skills`, commands, `AGENTS.md`, `.cursorrules`, … | Inventoried only |
+<ol style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
+<li>Install <b>Chaintrap Agent Shield</b> (<code>pri17m.chaintrap-agent-shield</code>).</li>
+<li>Open a folder. Status bar: <code>Chaintrap: scanning workspace…</code></li>
+<li>Open the <b>Chaintrap</b> activity bar → <b>Dependencies</b>.</li>
+</ol>
 
----
-
-## Security and privacy
-
-- **Reads** manifests, lockfiles, MCP JSON, and skill/rule paths above. Does not execute workspace code.
-- **Sends to the network (default):** package **name**, **version**, and ecosystem to `https://api.osv.dev/v1/querybatch`, and `https://api.osv.dev/v1/vulns/{id}` for advisory summaries.
-- **Does not upload** source files or skill/rule bodies.
-- **Optional:** with a SecretStorage API key, VS Code **extension id** may be sent to `scan.chaintrap.com`.
-- **Telemetry:** none in current versions (no usage pings).
-- **Stored locally:** findings, acks, and baselines in VS Code `globalState`.
-
-Full detail: [PRIVACY.md](PRIVACY.md).
+<p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;">No API key required.</p>
 
 ---
 
-## Who it is for
+<h2 style="font-family: Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif; font-weight: 700;">Commands</h2>
 
-Developers and security reviewers using **Cursor / VS Code / Claude Code** who want an in-editor check of **what packages and MCP-inferred dependencies** are pinned—not a replacement for Snyk or MCP protocol scanners.
+<table>
+<tr>
+<th style="font-family: Palatino, Palatino Linotype, Georgia, serif;">Command</th>
+<th style="font-family: Palatino, Palatino Linotype, Georgia, serif;">What it does</th>
+</tr>
+<tr>
+<td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;"><b>Chaintrap: Rescan workspace baseline</b></td>
+<td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;">Scan the workspace again</td>
+</tr>
+<tr>
+<td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;"><b>Chaintrap: Review agent changes since last session</b></td>
+<td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;">What appeared after this window opened</td>
+</tr>
+<tr>
+<td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;"><b>Chaintrap: Acknowledge high/critical finding</b></td>
+<td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;">Confirm you have seen a serious finding</td>
+</tr>
+<tr>
+<td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;"><b>Chaintrap: Uninstall malicious package</b></td>
+<td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;">Remove a malware pin from the Dependencies view</td>
+</tr>
+<tr>
+<td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;"><b>Chaintrap: Open finding location</b></td>
+<td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;">Jump to the file that pinned it</td>
+</tr>
+</table>
 
 ---
 
-## Open source
+<h2 style="font-family: Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif; font-weight: 700;">Privacy</h2>
 
-MIT. Source: [github.com/pri17m/chaintrap-agent-shield](https://github.com/pri17m/chaintrap-agent-shield). Issues welcome. No third-party audit is claimed.
-
----
-
-## Settings
-
-| Setting | Default | Purpose |
-|---------|---------|---------|
-| `chaintrap.apiBase` | `https://scan.chaintrap.com` | Optional deep-scan API |
-| `chaintrap.apiKey` | empty | Deprecated — use **Set API key** |
-| `chaintrap.enableDeepExtensionScan` | `false` | Notify when VS Code extensions change |
+<p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
+Reads dependency and MCP files in the folders you have open. Does not run workspace code and does not upload source. Full detail: <a href="PRIVACY.md"><b>PRIVACY.md</b></a>.
+</p>
 
 ---
 
-## Develop
-
-```bash
-npm install
-npm test
-npm run compile
-npm run package
-```
-
-F5 → Extension Development Host. Dogfood folders: `fixtures/dogfood`, or a **manifest-only** test repo (do not `npm install` malware pins). See [DOGFOOD.md](DOGFOOD.md).
+<p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
+MIT. <a href="https://github.com/pri17m/chaintrap-agent-shield">github.com/pri17m/chaintrap-agent-shield</a>
+</p>

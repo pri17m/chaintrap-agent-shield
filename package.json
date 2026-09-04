@@ -1,13 +1,13 @@
 {
   "name": "chaintrap-agent-shield",
   "displayName": "Chaintrap Agent Shield — AI-Coding Security",
-  "description": "Visibility for AI coding agents: scan workspace and MCP configs for malicious or vulnerable npm/PyPI packages (OSV + known-bad). Does not block npm/pip.",
-  "version": "0.1.11",
+  "description": "Catch malicious and vulnerable packages your AI coding agent installed. Scan the workspace, then review or uninstall from the editor.",
+  "version": "0.1.14",
   "publisher": "pri17m",
   "license": "MIT",
   "icon": "media/icon.png",
   "galleryBanner": {
-    "color": "#0B1220",
+    "color": "#081122",
     "theme": "dark"
   },
   "categories": ["Linters", "Other"],
