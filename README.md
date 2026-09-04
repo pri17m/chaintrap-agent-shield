@@ -1,8 +1,20 @@
-# Chaintrap Agent Shield
+<div align="center">
+
+<img src="media/icon.png" width="112" height="112" alt="Chaintrap Agent Shield">
+
+<h1 style="font-family: Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif; font-weight: 700; letter-spacing: -0.03em; margin: 0.4em 0 0.25em;">Chaintrap Agent Shield</h1>
+
+<p>
+<a href="https://marketplace.visualstudio.com/items?itemName=pri17m.chaintrap-agent-shield"><b>Marketplace</b></a>
+&nbsp;·&nbsp;
+<a href="https://github.com/pri17m/chaintrap-agent-shield"><b>GitHub</b></a>
+&nbsp;·&nbsp;
+<a href="PRIVACY.md"><b>Privacy</b></a>
+</p>
+
+</div>
 
 Workspace visibility for packages introduced by AI coding agents (Cursor, Claude Code, GitHub Copilot). Chaintrap inventories npm and PyPI pins in the open folder and in MCP server configs, classifies each as malicious or vulnerable, and lets the operator remove the pin from the editor.
-
-[Marketplace](https://marketplace.visualstudio.com/items?itemName=pri17m.chaintrap-agent-shield) · [Privacy](PRIVACY.md)
 
 <img src="media/screenshots/chaintrap-tree.png" alt="Chaintrap activity bar: Dependencies and MCP servers grouped as malicious, vulnerable, or unpinned">
 
