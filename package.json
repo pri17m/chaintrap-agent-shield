@@ -2,7 +2,7 @@
   "name": "chaintrap-agent-shield",
   "displayName": "Chaintrap Agent Shield — AI-Coding Security",
   "description": "Inventory malicious and vulnerable npm/PyPI packages in the workspace and in MCP server configs. Classify malware vs CVE. Remove the pin from the editor.",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "publisher": "pri17m",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -136,15 +136,16 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "test": "npm run compile && mocha --ui tdd --timeout 10000 out/test/**/*.test.js",
-    "package": "npx --yes @vscode/vsce package --no-dependencies",
+    "package": "vsce package --no-dependencies",
     "sync-intel": "node scripts/sync-intel.mjs"
   },
   "devDependencies": {
-    "@types/mocha": "^10.0.10",
-    "@types/node": "^20.17.10",
-    "@types/vscode": "^1.85.0",
-    "mocha": "^11.1.0",
-    "typescript": "^5.7.3"
+    "@types/mocha": "10.0.10",
+    "@types/node": "20.19.43",
+    "@types/vscode": "1.136.0",
+    "@vscode/vsce": "3.9.2",
+    "mocha": "11.8.0",
+    "typescript": "5.9.3"
   },
   "repository": {
     "type": "git",

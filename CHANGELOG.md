@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.23
+
+- Pin npm devDependencies and `@vscode/vsce` to exact versions; SHA-pin GitHub Actions
+
 ## 0.1.22
 
 - Marketplace README: CISO-facing inventory copy; remove decorative rules and marketing captions
