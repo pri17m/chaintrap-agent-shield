@@ -14,11 +14,15 @@ import { promptCriticalAcks } from "./ackFlow";
 
 import { AgentActivityProvider } from "./agentActivityTree";
 
-import { countUnackedHighCritical, statusBarText } from "./findingCopy";
+import { countUnackedHighCritical } from "./findingCopy";
 
 import { isManifestPackage, isMcpServerFinding } from "./findingGroups";
 
 import { applyDeltaFindings, replaceBaselineFindings, scopeFindingsForDisplay, skipKeysCoveredByFindings } from "./findingMerge";
+
+import { EMPTY_INVENTORY_SUMMARY, buildPosture, summarizeInventory, type InventorySummary } from "./postureModel";
+
+import { PostureProvider } from "./postureTree";
 
 import { ProblemsReporter } from "./problems";
 
@@ -60,6 +64,8 @@ export class ShieldController {
 
   private deltaRunning = false;
 
+  private lastSummary: InventorySummary = { ...EMPTY_INVENTORY_SUMMARY };
+
 
 
   constructor(
@@ -70,9 +76,13 @@ export class ShieldController {
 
     private readonly trees: AgentActivityProvider[],
 
+    private readonly posture: PostureProvider,
+
     private readonly status: vscode.StatusBarItem,
 
     private readonly treeViews: vscode.TreeView<unknown>[] = [],
+
+    private readonly postureView?: vscode.TreeView<unknown>,
 
   ) {}
 
@@ -99,6 +109,32 @@ export class ShieldController {
     for (const tree of this.trees) {
 
       tree.refresh(shown);
+
+    }
+
+  }
+
+
+
+  private applyPosture(shown: Finding[]): void {
+
+    this.posture.refresh(shown, this.lastSummary);
+
+    const model = buildPosture(shown, this.lastSummary);
+
+    this.status.text = model.statusText;
+
+    this.status.tooltip = model.statusTooltip;
+
+    if (this.postureView) {
+
+      const count = model.attentionBadge;
+
+      this.postureView.badge = count
+
+        ? { value: count, tooltip: `${count} unacknowledged high/critical finding${count === 1 ? "" : "s"}` }
+
+        : undefined;
 
     }
 
@@ -146,7 +182,7 @@ export class ShieldController {
 
     this.updateBadge(shown);
 
-    this.status.text = statusBarText(shown);
+    this.applyPosture(shown);
 
     if (promptAck) {
 
@@ -162,7 +198,7 @@ export class ShieldController {
 
       this.updateBadge(shownAfter);
 
-      this.status.text = statusBarText(shownAfter);
+      this.applyPosture(shownAfter);
 
     }
 
@@ -184,7 +220,7 @@ export class ShieldController {
 
     this.updateBadge(shown);
 
-    this.status.text = statusBarText(shown);
+    this.applyPosture(shown);
 
   }
 
@@ -203,6 +239,12 @@ export class ShieldController {
     try {
 
       this.status.text = "Chaintrap: scanning workspace…";
+
+      this.status.tooltip = "Scan in progress";
+
+      this.lastSummary = { ...this.lastSummary, scanning: true, hasOpenFolder: roots.length > 0 };
+
+      this.posture.setScanning(this.lastSummary);
 
       const openRoots = this.openRootPaths(roots);
 
@@ -239,6 +281,8 @@ export class ShieldController {
 
 
 
+      this.lastSummary = summarizeInventory(allItems, openRoots.length > 0);
+
       const merged = replaceBaselineFindings(this.store.getFindings(), findings, this.store.getAcks(), openRoots, {
 
         skipKeys,
@@ -249,31 +293,15 @@ export class ShieldController {
 
       await this.publish(merged, openRoots, true);
 
-      const pkgs = allItems.filter((i) => i.kind === "package" || i.kind === "mcp").length;
-
-      const skills = allItems.filter((i) => i.kind === "skill").length;
-
       const shown = this.displayFindings(this.store.getFindings(), openRoots);
 
       const crit = shown.filter((f) => f.severity === "critical" && !f.acknowledged).length;
-
-      this.status.text = `Chaintrap: baseline complete (${pkgs} packages, ${skills} skills)`;
 
       if (crit) {
 
         void vscode.window.showWarningMessage(`Chaintrap baseline found ${crit} critical issue(s).`);
 
       }
-
-      // Restore status to reflect remaining unacked after optional warning
-
-      this.status.text =
-
-        countUnackedHighCritical(shown) > 0
-
-          ? statusBarText(shown)
-
-          : `Chaintrap: baseline complete (${pkgs} packages, ${skills} skills)`;
 
     } finally {
 
@@ -368,6 +396,8 @@ export class ShieldController {
 
       }
 
+      this.lastSummary = summarizeInventory(liveItems, openRoots.length > 0);
+
       if (deltaItems.length === 0) {
 
         // Still prune removed paths against live inventory
@@ -377,6 +407,10 @@ export class ShieldController {
         if (pruned.length !== this.store.getFindings().length) {
 
           await this.publish(pruned, openRoots, false);
+
+        } else {
+
+          this.applyPosture(this.displayFindings(this.store.getFindings(), openRoots));
 
         }
 

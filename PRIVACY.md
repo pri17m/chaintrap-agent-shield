@@ -16,7 +16,7 @@ Only these surfaces are inventoried (workspace roots you have open, plus user ag
 
 - Dependency manifests and lockfiles (`package.json`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `requirements.txt`). `uv.lock` is watched for change notifications but not fully parsed yet.
 
-- MCP configs (workspace `.cursor/mcp.json`, `~/.cursor/mcp.json`, VS Code / Cursor User `mcp.json`)
+- MCP configs (workspace `.cursor/mcp.json`, workspace `.vscode/mcp.json`, `~/.cursor/mcp.json`, VS Code / Cursor User `mcp.json`)
 
 - Skill and rule files (inventoried only; not heuristically flagged): `.cursor/skills`, `.claude/skills`, commands, `.cursor/rules`, `AGENTS.md`, `CLAUDE.md`, `MEMORY.md`, `SOUL.md`, `.cursorrules`, Claude settings JSON
 

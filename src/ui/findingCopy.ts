@@ -1,4 +1,5 @@
 import type { Finding } from "../types";
+import { buildPosture, EMPTY_INVENTORY_SUMMARY, type InventorySummary } from "./postureModel";
 
 
 
@@ -108,26 +109,12 @@ export function formatAckBody(f: Finding): string {
 
 
 
-export function statusBarText(findings: Finding[]): string {
+export function statusBarText(findings: Finding[], summary?: InventorySummary): string {
+  return buildPosture(findings, summary ?? EMPTY_INVENTORY_SUMMARY).statusText;
+}
 
-  const n = countUnackedHighCritical(findings);
-
-  if (n === 0) {
-
-    return "Chaintrap: ready";
-
-  }
-
-  const crit = findings.filter((f) => !f.acknowledged && f.severity === "critical").length;
-
-  if (crit > 0) {
-
-    return `Chaintrap: ${crit} critical`;
-
-  }
-
-  return `Chaintrap: ${n} high`;
-
+export function statusBarTooltip(findings: Finding[], summary?: InventorySummary): string {
+  return buildPosture(findings, summary ?? EMPTY_INVENTORY_SUMMARY).statusTooltip;
 }
 
 

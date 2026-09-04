@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.24
+
+- Workspace posture tree at the top of the Chaintrap activity bar (attention, coverage gaps, what was checked)
+- Status bar follows the same rollup (malicious, then unacked high/critical, then coverage gaps, then packages checked); click focuses posture
+- Inventory workspace `.vscode/mcp.json` in addition to `.cursor/mcp.json`
+
 ## 0.1.23
 
 - Pin npm devDependencies and `@vscode/vsce` to exact versions; SHA-pin GitHub Actions
