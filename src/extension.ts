@@ -3,9 +3,10 @@ import { ChaintrapClient } from "./api/chaintrapClient";
 import { ApiKeyStore } from "./store/apiKeyStore";
 import { StateStore } from "./store/stateStore";
 import { openFindingLocation } from "./ui/ackFlow";
-import { AgentActivityProvider } from "./ui/agentActivityTree";
+import { AgentActivityProvider, FindingItem } from "./ui/agentActivityTree";
 import { ShieldController } from "./ui/controller";
 import { needsAckPopup } from "./ui/findingCopy";
+import { uninstallMaliciousFinding } from "./ui/uninstallFlow";
 import { ProblemsReporter } from "./ui/problems";
 import { createWatchers } from "./watchers/fileWatchers";
 
@@ -96,6 +97,17 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("chaintrap.clearApiKey", async () => {
       await apiKeys.clear();
       void vscode.window.showInformationMessage("Chaintrap API key cleared.");
+    }),
+    vscode.commands.registerCommand("chaintrap.uninstallMaliciousPackage", async (item?: FindingItem) => {
+      const finding = item?.finding;
+      if (!finding) {
+        void vscode.window.showInformationMessage("Right-click a malicious package in the Chaintrap view.");
+        return;
+      }
+      const ok = await uninstallMaliciousFinding(finding);
+      if (ok) {
+        await controller.runBaseline(folders());
+      }
     }),
     vscode.commands.registerCommand("chaintrap.installGuard", () => {
       void vscode.env.openExternal(

@@ -16,7 +16,7 @@ import { AgentActivityProvider } from "./agentActivityTree";
 
 import { countUnackedHighCritical, statusBarText } from "./findingCopy";
 
-import { applyDeltaFindings, replaceBaselineFindings, scopeFindingsForDisplay } from "./findingMerge";
+import { applyDeltaFindings, replaceBaselineFindings, scopeFindingsForDisplay, skipKeysCoveredByFindings } from "./findingMerge";
 
 import { ProblemsReporter } from "./problems";
 
@@ -192,25 +192,16 @@ export class ShieldController {
 
       const allItems: InventoryItem[] = [...userItems, ...rootItems.flat()];
 
-
-
-      const skipKeys = new Set<string>();
-
+      const candidateSkip = new Set<string>();
       for (const k of unchangedKeys(baselines["__user_config__"], userItems)) {
-
-        skipKeys.add(k);
-
+        candidateSkip.add(k);
       }
-
       roots.forEach((folder, i) => {
-
         for (const k of unchangedKeys(baselines[folder.uri.fsPath], rootItems[i])) {
-
-          skipKeys.add(k);
-
+          candidateSkip.add(k);
         }
-
       });
+      const skipKeys = skipKeysCoveredByFindings(candidateSkip, allItems, this.store.getFindings());
 
 
 
@@ -226,7 +217,13 @@ export class ShieldController {
 
 
 
-      const merged = replaceBaselineFindings(this.store.getFindings(), findings, this.store.getAcks(), openRoots);
+      const merged = replaceBaselineFindings(this.store.getFindings(), findings, this.store.getAcks(), openRoots, {
+
+        skipKeys,
+
+        liveItems: allItems,
+
+      });
 
       await this.publish(merged, openRoots, true);
 

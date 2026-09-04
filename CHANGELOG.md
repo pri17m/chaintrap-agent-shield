@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.9
+
+- High/critical ack uses a branded **Chaintrap finding** webview (not the Visual Studio Code error dialog)
+- Marketplace listing copy: README + `displayName` (**AI-Coding Security**) / description / keywords aligned to implemented package/MCP OSV checks only
+
+## 0.1.8
+
+- Fix empty Dependencies tree after reload: keep findings for unchanged packages; re-analyze when no stored finding covers that inventory key
+
+## 0.1.7
+
+- Dependencies view groups **Malicious** vs **Vulnerable** packages (baseline/delta stays on the row)
+- Right-click Uninstall on malicious items: `npm uninstall`, `pip uninstall` + requirements strip, or remove MCP server from `mcp.json`
+- Finding records a `malicious` flag (known-bad / OSV MAL-*)
+- Blocking installs remains Chaintrap Guard (separate download)
+
 ## 0.1.6
 
 - Disable skill/rule heuristic findings (false positives). Inventory still records skills/rules; only npm/PyPI and MCP-inferred packages are flagged

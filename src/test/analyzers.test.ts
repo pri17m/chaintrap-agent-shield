@@ -18,7 +18,10 @@ import {
 import { ApiKeyStore } from "../store/apiKeyStore";
 import { diffItems } from "../store/diffEngine";
 import { formatAckBody, needsAckPopup, countUnackedHighCritical, findingTreeCommand, statusBarText } from "../ui/findingCopy";
-import { applyDeltaFindings, replaceBaselineFindings, scopeFindingsForDisplay } from "../ui/findingMerge";
+import { ackViewModel } from "../ui/ackViewModel";
+import { groupDependencyFindings } from "../ui/findingGroups";
+import { applyDeltaFindings, replaceBaselineFindings, scopeFindingsForDisplay, skipKeysCoveredByFindings } from "../ui/findingMerge";
+import { removeMcpServerByPackage, removePackageJsonDependency, stripRequirementsLine } from "../store/uninstall";
 import { homeWatchRoots } from "../watchers/homeWatchRoots";
 import type { Finding, InventoryItem } from "../types";
 
@@ -116,6 +119,7 @@ suite("knownBad + packageAnalyzer", () => {
     );
     const hit = findings.find((f) => f.packageName === "Markdown");
     assert.ok(hit);
+    assert.strictEqual(hit!.malicious, false);
     assert.strictEqual(hit!.title, "This PyPI package is vulnerable");
     assert.strictEqual(hit!.summary, "Python-Markdown has an Uncaught Exception");
     assert.match(hit!.message, /Description: Python-Markdown has an Uncaught Exception/);
@@ -486,6 +490,58 @@ suite("findingMerge", () => {
     assert.strictEqual(keep?.acknowledged, true);
   });
 
+  test("baseline replace keeps skipped-key findings when incoming is empty", () => {
+    const existing = [
+      f({
+        id: "nx",
+        path: "/repo/package.json",
+        packageName: "nx",
+        version: "20.9.0",
+        ecosystem: "npm",
+        malicious: true,
+        severity: "critical",
+      }),
+    ];
+    const liveItems: InventoryItem[] = [
+      {
+        key: "pkg:npm:nx@20.9.0:/repo/package.json",
+        kind: "package",
+        path: "/repo/package.json",
+        hash: "h",
+        workspaceRoot: "/repo",
+        packageName: "nx",
+        version: "20.9.0",
+        ecosystem: "npm",
+      },
+    ];
+    const merged = replaceBaselineFindings(existing, [], {}, ["/repo"], {
+      skipKeys: new Set(["pkg:npm:nx@20.9.0:/repo/package.json"]),
+      liveItems,
+    });
+    assert.ok(merged.some((x) => x.id === "nx"));
+  });
+
+  test("skipKeysCoveredByFindings drops keys with no stored finding", () => {
+    const liveItems: InventoryItem[] = [
+      {
+        key: "pkg:npm:nx@20.9.0:/repo/package.json",
+        kind: "package",
+        path: "/repo/package.json",
+        hash: "h",
+        workspaceRoot: "/repo",
+        packageName: "nx",
+        version: "20.9.0",
+        ecosystem: "npm",
+      },
+    ];
+    const covered = skipKeysCoveredByFindings(
+      new Set(["pkg:npm:nx@20.9.0:/repo/package.json"]),
+      liveItems,
+      [],
+    );
+    assert.strictEqual(covered.size, 0);
+  });
+
   test("delta prunes findings whose path left the live inventory", () => {
     const existing = [
       f({ id: "a", path: "/repo/package.json" }),
@@ -604,5 +660,100 @@ suite("ack + status alignment", () => {
     assert.strictEqual(needsAckPopup(acked), false);
     assert.strictEqual(countUnackedHighCritical([acked]), 0);
     assert.strictEqual(statusBarText([acked]), "Chaintrap: ready");
+  });
+});
+
+suite("ackViewModel", () => {
+  test("maps nx-style malicious finding", () => {
+    const vm = ackViewModel(
+      {
+        id: "baseline:package:npm:nx@20.9.0:/repo/package.json",
+        source: "baseline",
+        surface: "package",
+        severity: "critical",
+        title: "This npm package is malicious",
+        message: "Description: Malicious code in nx (npm)",
+        summary: "Malicious code in nx (npm)",
+        path: "c:/Users/user2/Documents/GitHub/chaintrap-shield-uninstall-test/package.json",
+        packageName: "nx",
+        version: "20.9.0",
+        ecosystem: "npm",
+        osvIds: ["GHSA-g2r8-wvmj-jf5w", "MAL-2025-41443"],
+        advisoryUrl: "https://osv.dev/vulnerability/MAL-2025-41443",
+        acknowledged: false,
+        createdAt: new Date().toISOString(),
+        malicious: true,
+      },
+      1,
+      4,
+    );
+    assert.strictEqual(vm.pill, "Malicious");
+    assert.strictEqual(vm.packageLabel, "nx@20.9.0");
+    assert.strictEqual(vm.title, "This npm package is malicious");
+    assert.match(vm.description, /Malicious code in nx/);
+    assert.strictEqual(vm.index, 1);
+    assert.strictEqual(vm.total, 4);
+    assert.ok(vm.advisoryUrl);
+  });
+});
+
+suite("findingGroups", () => {
+  const now = new Date().toISOString();
+  const f = (partial: Partial<Finding>): Finding => ({
+    id: "x",
+    source: "baseline",
+    surface: "package",
+    severity: "high",
+    title: "t",
+    message: "m",
+    path: "/repo/package.json",
+    packageName: "pkg",
+    version: "1.0.0",
+    ecosystem: "npm",
+    acknowledged: false,
+    createdAt: now,
+    ...partial,
+  });
+
+  test("splits malicious vs vulnerable and skips unverified", () => {
+    const grouped = groupDependencyFindings([
+      f({ id: "m", malicious: true, severity: "critical", title: "This npm package is malicious" }),
+      f({ id: "v", malicious: false, severity: "high", title: "This npm package is vulnerable" }),
+      f({ id: "o", unverifiedOnline: true, severity: "info", title: "Could not verify" }),
+      f({ id: "s", surface: "skill", packageName: undefined, title: "skill" }),
+    ]);
+    assert.deepStrictEqual(grouped.malicious.map((x) => x.id), ["m"]);
+    assert.deepStrictEqual(grouped.vulnerable.map((x) => x.id), ["v"]);
+  });
+});
+
+suite("uninstall helpers", () => {
+  test("stripRequirementsLine removes matching pin", () => {
+    const raw = "# keep\nboto4==1.0.2\nMarkdown==3.8\n";
+    const next = stripRequirementsLine(raw, "boto4");
+    assert.ok(!next.includes("boto4"));
+    assert.match(next, /Markdown==3.8/);
+    assert.match(next, /# keep/);
+  });
+
+  test("removePackageJsonDependency drops npm dep", () => {
+    const raw = JSON.stringify({ dependencies: { nx: "20.9.0", lodash: "4.17.20" } }, null, 2);
+    const next = JSON.parse(removePackageJsonDependency(raw, "nx")) as { dependencies: Record<string, string> };
+    assert.strictEqual(next.dependencies.nx, undefined);
+    assert.strictEqual(next.dependencies.lodash, "4.17.20");
+  });
+
+  test("removeMcpServerByPackage drops inferred npm server", () => {
+    const raw = JSON.stringify({
+      mcpServers: {
+        docs: { command: "npx", args: ["-y", "chrome-devtools-mcp"] },
+        postman: { command: "npx", args: ["-y", "@postman/postman-mcp-cli@1.0.4"] },
+      },
+    });
+    const { next, removed } = removeMcpServerByPackage(raw, "@postman/postman-mcp-cli");
+    assert.deepStrictEqual(removed, ["postman"]);
+    const doc = JSON.parse(next) as { mcpServers: Record<string, unknown> };
+    assert.ok(doc.mcpServers.docs);
+    assert.strictEqual(doc.mcpServers.postman, undefined);
   });
 });

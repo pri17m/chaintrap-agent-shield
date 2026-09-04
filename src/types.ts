@@ -35,6 +35,8 @@ export interface Finding {
   workspaceRoot?: string;
   createdAt: string;
   unverifiedOnline?: boolean;
+  /** True for known-bad or OSV MAL-*. False/undefined for CVE-only or informational. */
+  malicious?: boolean;
 }
 
 export interface BaselineSnapshot {

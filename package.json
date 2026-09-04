@@ -1,8 +1,8 @@
 {
   "name": "chaintrap-agent-shield",
-  "displayName": "Chaintrap Agent Shield",
-  "description": "EDR-style visibility for AI coding agents: baseline-scan workspace npm/PyPI packages and MCP-inferred dependencies; warn on malicious or vulnerable installs.",
-  "version": "0.1.6",
+  "displayName": "Chaintrap Agent Shield — AI-Coding Security",
+  "description": "Visibility for AI coding agents: scan workspace and MCP configs for malicious or vulnerable npm/PyPI packages (OSV + known-bad). Does not block npm/pip.",
+  "version": "0.1.9",
   "publisher": "pri17m",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -10,15 +10,18 @@
     "color": "#0B1220",
     "theme": "dark"
   },
-  "categories": ["Other", "Linters"],
+  "categories": ["Linters", "Other"],
   "keywords": [
-    "security",
-    "supply-chain",
+    "ai-coding",
+    "ai agent",
     "mcp",
     "osv",
+    "npm",
+    "pypi",
+    "supply-chain",
     "malware",
     "cursor",
-    "ai-agent"
+    "security"
   ],
   "engines": {
     "vscode": "^1.85.0"
@@ -58,6 +61,10 @@
         "title": "Chaintrap: Deep-scan installed VS Code extensions (API key)"
       },
       {
+        "command": "chaintrap.uninstallMaliciousPackage",
+        "title": "Chaintrap: Uninstall malicious package"
+      },
+      {
         "command": "chaintrap.installGuard",
         "title": "Chaintrap: Open Guard install-protection docs"
       }
@@ -75,7 +82,21 @@
       "chaintrap": [
         {
           "id": "chaintrap.activity",
-          "name": "Agent Activity"
+          "name": "Dependencies"
+        }
+      ]
+    },
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "chaintrap.uninstallMaliciousPackage",
+          "when": "view == chaintrap.activity && viewItem == maliciousPackage",
+          "group": "inline"
+        },
+        {
+          "command": "chaintrap.uninstallMaliciousPackage",
+          "when": "view == chaintrap.activity && viewItem == maliciousPackage",
+          "group": "0_actions"
         }
       ]
     },
@@ -122,7 +143,7 @@
   "bugs": {
     "url": "https://github.com/pri17m/chaintrap-agent-shield/issues"
   },
-  "homepage": "https://chaintrap.com",
+  "homepage": "https://marketplace.visualstudio.com/items?itemName=pri17m.chaintrap-agent-shield",
   "qna": "marketplace",
   "capabilities": {
     "untrustedWorkspaces": {

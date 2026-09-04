@@ -72,6 +72,7 @@ export async function analyzePackages(
         acknowledged: false,
         workspaceRoot: pkg.workspaceRoot,
         createdAt: now,
+        malicious: true,
       });
     }
     if (!pkg.version || pkg.version === "unknown") {
@@ -196,6 +197,7 @@ export async function analyzePackages(
       acknowledged: false,
       workspaceRoot: pkg.workspaceRoot,
       createdAt: now,
+      malicious: cls.malicious,
     });
   });
 
