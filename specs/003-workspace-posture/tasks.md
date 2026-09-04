@@ -31,4 +31,4 @@
 - [x] T008 Unit tests in `src/test/postureModel.test.ts` (rollup priority, empty/scanning, unpinned vs unverified, skills not in gap count)
 - [x] T009 Inventory test for `.vscode/mcp.json`; update status-bar assertion that expected `Chaintrap: ready`
 - [x] T010 README Operation, CHANGELOG 0.1.24, PRIVACY MCP path list, `package.json` version 0.1.24
-- [ ] T011 `npm test` green
+- [x] T011 `npm test` green
