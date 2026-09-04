@@ -5,8 +5,8 @@
 <h1 style="font-family: Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif; font-weight: 700; letter-spacing: -0.03em; margin: 0.4em 0 0.25em;">Chaintrap Agent Shield</h1>
 
 <p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; font-size: 1.15em; line-height: 1.45; max-width: 38em; margin: 0 auto 1em;">
-<b>See if an MCP server config pulls a malicious or vulnerable package—separate from project dependencies.</b><br>
-When Cursor, Claude Code, or Copilot adds a pin, Chaintrap flags malware vs a known CVE so you can uninstall it. Detection-only: does not wrap npm or pip.
+<b>Catch malicious MCP servers and dependencies while you code.</b><br>
+When Cursor, Claude Code, or Copilot adds a package, Chaintrap tells you if it is malware or a known CVE—and you uninstall it from the tree.
 </p>
 
 <p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;">
@@ -27,9 +27,9 @@ When Cursor, Claude Code, or Copilot adds a pin, Chaintrap flags malware vs a kn
 
 <p align="center" style="font-family: Palatino, 'Palatino Linotype', Georgia, serif; font-style: italic;">Right-click a malicious MCP server. That server comes out of the config. Other servers that happen to use the same package stay.</p>
 
-<p align="center"><img src="media/screenshots/uninstall-package.png" alt="Confirm uninstall of a malicious PyPI pin from the manifest without running pip install"></p>
+<p align="center"><img src="media/screenshots/uninstall-package.png" alt="Confirm uninstall of a malicious PyPI pin from the manifest"></p>
 
-<p align="center" style="font-family: Palatino, 'Palatino Linotype', Georgia, serif; font-style: italic;">Same action for a malware pin in the manifest. Detection-only: does not wrap npm or pip.</p>
+<p align="center" style="font-family: Palatino, 'Palatino Linotype', Georgia, serif; font-style: italic;">Same one-click uninstall for a malware pin in the project manifest.</p>
 
 ---
 
@@ -56,7 +56,7 @@ You see it in the editor. You can open the pin, acknowledge the risk, or uninsta
 </p>
 
 <p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
-<b>See MCP servers on their own list.</b> If a server config pulls a malicious or vulnerable package, it shows under MCP servers—not mixed into Dependencies. No version in the args? It lands in Unpinned. This is the package the config would install, not a scan of MCP tool schemas.
+<b>See MCP servers on their own list.</b> If a server config pulls a malicious or vulnerable package, it shows under MCP servers—not mixed into Dependencies. No version in the args? It lands in Unpinned.
 </p>
 
 <p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">

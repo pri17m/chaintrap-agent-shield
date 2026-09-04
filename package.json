@@ -1,8 +1,8 @@
 {
   "name": "chaintrap-agent-shield",
   "displayName": "Chaintrap Agent Shield — AI-Coding Security",
-  "description": "See if an MCP server config pulls a malicious or vulnerable package—separate from project dependencies. Detection-only: does not wrap npm or pip.",
-  "version": "0.1.20",
+  "description": "Catch malicious MCP servers and dependencies your AI coding agent added. Flag malware vs known CVEs, then uninstall from the editor.",
+  "version": "0.1.21",
   "publisher": "pri17m",
   "license": "MIT",
   "icon": "media/icon.png",

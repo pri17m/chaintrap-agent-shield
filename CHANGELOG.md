@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.21
+
+- Marketplace lead copy: MCP + dependency malware in the editor; drop “what we don’t do” from the first lines
+
 ## 0.1.20
 
 - Uninstall malicious npm/PyPI pins by editing the manifest only (no `npm`/`pip` spawn — fixes Windows `spawn EINVAL`)
