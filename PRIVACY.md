@@ -34,7 +34,7 @@ The extension does not execute workspace code. It does not upload source files.
 
 
 
-**If OSV is unreachable:** the bundled `known_bad_packages.json` is used. Unknown packages are reported as “Could not verify online” — not treated as safe.
+**If OSV is unreachable:** the extension falls back to a bundled offline list of malicious packages. Unknown packages are reported as “Could not verify online” — not treated as safe.
 
 
 

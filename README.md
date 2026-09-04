@@ -15,7 +15,7 @@
 </div>
 
 <p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
-AI-coding supply-chain security for Cursor / VS Code. Chaintrap inventories npm and PyPI pins in the open workspace and in MCP configs, classifies each as malicious (OSV MAL-* or known-bad) or vulnerable (CVE/GHSA), and surfaces a posture rollup so you can review what the agent pulled in.
+AI-coding supply-chain security for Cursor / VS Code. Chaintrap inventories npm and PyPI pins in the open workspace and in MCP configs, classifies each as malicious packages or vulnerable packages (CVE/GHSA), and surfaces a posture rollup so you can review what the agent pulled in.
 </p>
 
 <img src="media/screenshots/chaintrap-tree.png" alt="Chaintrap activity bar: Dependencies and MCP servers grouped as malicious, vulnerable, or unpinned">
@@ -23,7 +23,7 @@ AI-coding supply-chain security for Cursor / VS Code. Chaintrap inventories npm 
 <h2 style="font-family: Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif; font-weight: 700;">Why this exists</h2>
 
 <ul style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
-<li><b>Agents edit lockfiles and MCP configs.</b> That’s where malicious packages and known-bad versions land.</li>
+<li><b>Agents edit lockfiles and MCP configs.</b> That’s where malicious packages and vulnerable versions land.</li>
 <li><b>MCP servers often run via <code>npx</code> / <code>pip</code>.</b> Those pins are dependencies too — just not in your <code>package.json</code>.</li>
 <li><b>You need visibility in the editor.</b> Review baseline vs “delta since this session opened” before you trust outputs.</li>
 </ul>
@@ -37,10 +37,10 @@ AI-coding supply-chain security for Cursor / VS Code. Chaintrap inventories npm 
 </ul>
 
 <p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
-Findings are malicious (known-bad or malware advisory) or vulnerable (CVE or GHSA). High and critical findings require an acknowledgement in the editor.
+Findings are malicious packages or vulnerable packages (CVE or GHSA). High and critical findings require an acknowledgement in the editor.
 </p>
 
-<img src="media/screenshots/ack.png" alt="In-editor acknowledgment modal for a critical known-bad package">
+<img src="media/screenshots/ack.png" alt="In-editor acknowledgment modal for a critical malicious package">
 
 <img src="media/screenshots/uninstall-mcp.png" alt="Confirm removal of one MCP server from mcp.json">
 
