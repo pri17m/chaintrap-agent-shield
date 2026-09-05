@@ -104,7 +104,7 @@ export async function analyzePackages(
           ...pkgFields(pkg),
           acknowledged: false,
           createdAt: now,
-          unverifiedOnline: true,
+          unverifiedOnline: !notExact,
           coverageNote: notExact,
           coverageKind: notExact ? "not-exact" : undefined,
         });

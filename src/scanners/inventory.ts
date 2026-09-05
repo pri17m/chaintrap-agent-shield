@@ -266,6 +266,16 @@ function parseMcpFile(filePath: string, workspaceRoot: string | undefined, items
   }
   for (const server of parseMcpConfigJson(raw)) {
     const inferred = inferredFromMcpServer(server);
+    let version = inferred?.version;
+    let pinExact: boolean | undefined;
+    let spec: string | undefined;
+    if (inferred && version && !isExactNpmSpec(version)) {
+      spec = version;
+      version = "unknown";
+      pinExact = false;
+    } else if (inferred && version && isExactNpmSpec(version)) {
+      pinExact = true;
+    }
     const key = `mcp:${filePath}:${server.id}`;
     items.push({
       key,
@@ -275,8 +285,10 @@ function parseMcpFile(filePath: string, workspaceRoot: string | undefined, items
       workspaceRoot,
       mcpId: server.id,
       packageName: inferred?.name,
-      version: inferred?.version,
+      version,
       ecosystem: inferred?.ecosystem,
+      pinExact,
+      spec,
     });
   }
 }

@@ -80,6 +80,10 @@ export function summarizeInventory(items: InventoryItem[], hasOpenFolder: boolea
   let rules = 0;
   for (const item of items) {
     if (item.kind === "package") {
+      const exact = item.pinExact !== false && Boolean(item.version) && item.version !== "unknown";
+      if (!exact) {
+        continue;
+      }
       if (item.ecosystem === "pypi") {
         pypiPins += 1;
       } else if (item.ecosystem === "npm") {

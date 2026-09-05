@@ -55,6 +55,30 @@ suite("pinSpec honesty", () => {
     const row = model.groups.find((g) => g.kind === "coverage")?.rows.find((r) => r.id === "notExact");
     assert.ok(row);
     assert.ok(notExactCoverageFindings(findings).length >= 1);
+    assert.ok(!notExact.some((f) => f.unverifiedOnline));
+    assert.ok(!model.groups.find((g) => g.kind === "coverage")?.rows.some((r) => r.id === "unverified"));
+  });
+
+  test("MCP @latest is a coverage gap and is not sent to OSV", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "inv-mcp-latest-"));
+    fs.mkdirSync(path.join(root, ".cursor"), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, ".cursor", "mcp.json"),
+      JSON.stringify({ mcpServers: { docs: { command: "npx", args: ["-y", "lodash@latest"] } } }),
+      "utf8",
+    );
+    const items = inventoryWorkspaceRoot(root);
+    const mcp = items.find((i) => i.kind === "mcp" && i.mcpId === "docs");
+    assert.strictEqual(mcp?.version, "unknown");
+    assert.strictEqual(mcp?.pinExact, false);
+    let osvCalled = false;
+    await analyzeItems(items, "baseline", async (url) => {
+      if (String(url).includes("querybatch")) {
+        osvCalled = true;
+      }
+      return { ok: true, json: async () => ({ results: [{}] }) } as Response;
+    });
+    assert.strictEqual(osvCalled, false);
   });
 
   test("pypi range line is not treated as == pin", () => {

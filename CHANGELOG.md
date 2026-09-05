@@ -5,6 +5,7 @@
 - Honest pins: `^` `~` ranges, tags, and git/file specs are coverage gaps — not sent to OSV as a floor version
 - `uvx` MCP servers infer PyPI (unpinned unless `name==version`)
 - Nested/monorepo manifests and lockfiles are inventoried (skip `node_modules` / build dirs; lockfile still wins per directory)
+- MCP `@latest` / range tags are unpinned coverage, not OSV-exact; Pin is npm/npx only
 
 ## 0.1.25
 

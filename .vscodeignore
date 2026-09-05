@@ -22,6 +22,7 @@ media/screenshots/agent-activity-ack.png
 .code-review-graph/**
 .gitnexus/**
 .specify/**
+.local/**
 specs/**
 .cursor/**
 **/*.db

@@ -107,7 +107,7 @@ export class FindingItem extends vscode.TreeItem {
     } else if (kind === "vulnerable") {
       this.contextValue = "vulnerablePackage";
     } else {
-      this.contextValue = "unpinnedMcpServer";
+      this.contextValue = finding.ecosystem === "npm" ? "unpinnedMcpServer" : "unpinnedMcpOther";
     }
   }
 }

@@ -228,8 +228,8 @@ suite("postureModel", () => {
 
   test("summarizeInventory counts kinds and MCP path sources", () => {
     const items: InventoryItem[] = [
-      { key: "a", kind: "package", path: "/r/package.json", hash: "1", ecosystem: "npm", packageName: "a" },
-      { key: "b", kind: "package", path: "/r/requirements.txt", hash: "2", ecosystem: "pypi", packageName: "b" },
+      { key: "a", kind: "package", path: "/r/package.json", hash: "1", ecosystem: "npm", packageName: "a", version: "1.0.0" },
+      { key: "b", kind: "package", path: "/r/requirements.txt", hash: "2", ecosystem: "pypi", packageName: "b", version: "1.0.0" },
       {
         key: "c",
         kind: "mcp",

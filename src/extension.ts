@@ -141,9 +141,11 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("chaintrap.pinMcpServerVersion", async (item?: FindingItem) => {
       let finding = item?.finding;
       if (!finding) {
-        const unpinned = groupMcpFindings(store.getFindings()).unpinned;
+        const unpinned = groupMcpFindings(store.getFindings()).unpinned.filter((f) => f.ecosystem === "npm");
         if (unpinned.length === 0) {
-          void vscode.window.showInformationMessage("No unpinned MCP servers in this workspace.");
+          void vscode.window.showInformationMessage(
+            "No unpinned npm MCP servers to pin. uvx/Python servers stay as coverage gaps (npx-style args only).",
+          );
           return;
         }
         if (unpinned.length === 1) {
