@@ -2,6 +2,27 @@ import * as assert from "assert";
 import { inferNpmPypiFromMcpRow, parseMcpConfigJson } from "../scanners/mcpParser";
 
 suite("mcpParser", () => {
+  test("npx package is the first spec, not later org/user args", () => {
+    const inf = inferNpmPypiFromMcpRow({
+      command: "npx",
+      args: ["-y", "@azure-devops/mcp", "pri17m"],
+    });
+    assert.deepStrictEqual(inf, { ecosystem: "npm", name: "@azure-devops/mcp", version: "unknown" });
+  });
+
+  test("unversioned scoped package is not skipped", () => {
+    const inf = inferNpmPypiFromMcpRow({
+      Command: "npx",
+      Args: ["-y", "@scope/w"],
+    });
+    assert.deepStrictEqual(inf, { ecosystem: "npm", name: "@scope/w", version: "unknown" });
+  });
+
+  test("uvx package is the first token, not later args", () => {
+    const inf = inferNpmPypiFromMcpRow({ command: "uvx", args: ["httpx", "serve"] });
+    assert.deepStrictEqual(inf, { ecosystem: "pypi", name: "httpx", version: "unknown" });
+  });
+
   test("infers scoped npm from npx -y", () => {
     const inf = inferNpmPypiFromMcpRow({
       Command: "npx",

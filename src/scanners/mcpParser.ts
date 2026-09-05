@@ -60,10 +60,37 @@ function lineImpliesUvx(line: string): boolean {
   return line.includes("uvx");
 }
 
+function isNpmInvokerToken(t: string): boolean {
+  const base = t.replace(/\\/g, "/").split("/").pop() || t;
+  return /^(npx|npm|pnpm|yarn|bunx)(\.cmd|\.exe)?$/i.test(base);
+}
+
+function parseNpmPackageSpec(cand: string): [string, string] | null {
+  if (!cand || cand === "." || cand.startsWith("-") || isNpmInvokerToken(cand)) {
+    return null;
+  }
+  if (cand.includes("\\") || /^[A-Za-z]:/.test(cand) || (cand.includes("/") && !cand.startsWith("@"))) {
+    return null;
+  }
+  if (cand.startsWith("@")) {
+    const m = cand.match(/^(@[^@/]+\/[^@/]+)(?:@(.+))?$/);
+    if (!m) {
+      return null;
+    }
+    return [m[1].trim().toLowerCase(), (m[2] || "").trim() || "unknown"];
+  }
+  const at = cand.indexOf("@");
+  if (at > 0) {
+    const name = cand.slice(0, at).trim().toLowerCase();
+    const ver = cand.slice(at + 1).trim() || "unknown";
+    return /^[a-z0-9._-]+$/.test(name) ? [name, ver] : null;
+  }
+  return /^[A-Za-z0-9._-]+$/.test(cand) ? [cand.toLowerCase(), "unknown"] : null;
+}
+
 function splitPypiSpecFromArgs(args: unknown[]): [string, string] | null {
   const tokens = args.map((a) => (typeof a === "string" ? a.trim() : String(a))).filter((t) => t && !t.startsWith("-"));
-  for (let i = tokens.length - 1; i >= 0; i--) {
-    const cand = tokens[i];
+  for (const cand of tokens) {
     if (cand.toLowerCase().includes("uvx")) {
       continue;
     }
@@ -125,25 +152,10 @@ function splitNpmSpecFromArgs(args: unknown[]): [string, string] | null {
     }
     filtered.push(t);
   }
-  for (let i = filtered.length - 1; i >= 0; i--) {
-    const cand = filtered[i];
-    if (!cand || cand === ".") {
-      continue;
-    }
-    if (cand.includes("@")) {
-      if (cand.startsWith("@")) {
-        const idx = cand.lastIndexOf("@");
-        if (idx > 0) {
-          return [cand.slice(0, idx).trim().toLowerCase(), cand.slice(idx + 1).trim() || "unknown"];
-        }
-      } else {
-        const idx = cand.indexOf("@");
-        if (idx > 0) {
-          return [cand.slice(0, idx).trim().toLowerCase(), cand.slice(idx + 1).trim() || "unknown"];
-        }
-      }
-    } else {
-      return [cand.trim().toLowerCase(), "unknown"];
+  for (const cand of filtered) {
+    const spec = parseNpmPackageSpec(cand);
+    if (spec) {
+      return spec;
     }
   }
   return null;

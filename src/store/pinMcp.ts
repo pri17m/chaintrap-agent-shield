@@ -1,10 +1,18 @@
 import { inferredFromMcpServer, parseMcpConfigJson } from "../scanners/mcpParser";
+import type { Finding } from "../types";
+import { pinPackageTokenInMcpServer } from "./mcpJsonEdit";
 import { stringifyMcpConfig } from "./uninstall";
 
 /** Exact version token we will write into mcp.json. No dist-tags, ranges, or URLs. */
 export function isPinVersion(raw: string): boolean {
   const v = raw.trim();
   return /^[0-9][A-Za-z0-9._+-]{0,63}$/.test(v);
+}
+
+/** Prefer the version already resolved during scan; never a dist-tag. */
+export function suggestedPinVersion(finding: Finding): string | undefined {
+  const resolved = finding.resolvedVersion?.trim();
+  return resolved && isPinVersion(resolved) ? resolved : undefined;
 }
 
 function packageNameFromNpmToken(token: string): string | undefined {
@@ -37,19 +45,39 @@ export function pinNpmSpecToken(token: string, packageName: string, version: str
   return `${pkg}@${version}`;
 }
 
-export function pinNpmArgs(args: unknown[], packageName: string, version: string): { args: unknown[]; changed: boolean } {
+export function pinPypiSpecToken(token: string, packageName: string, version: string): string {
+  const want = packageName.trim().toLowerCase().replace(/_/g, "-");
+  const t = token.trim();
+  const eq = t.match(/^([A-Za-z0-9_.-]+)==(.+)$/);
+  const name = (eq ? eq[1] : t).toLowerCase().replace(/_/g, "-");
+  if (name !== want) {
+    return token;
+  }
+  return `${eq ? eq[1] : t.split("==")[0]}==${version}`;
+}
+
+function pinArgsWith(
+  args: unknown[],
+  packageName: string,
+  version: string,
+  pinToken: (token: string, packageName: string, version: string) => string,
+): { args: unknown[]; changed: boolean } {
   let changed = false;
   const next = args.map((a) => {
     if (typeof a !== "string") {
       return a;
     }
-    const pinned = pinNpmSpecToken(a, packageName, version);
+    const pinned = pinToken(a, packageName, version);
     if (pinned !== a) {
       changed = true;
     }
     return pinned;
   });
   return { args: next, changed };
+}
+
+export function pinNpmArgs(args: unknown[], packageName: string, version: string): { args: unknown[]; changed: boolean } {
+  return pinArgsWith(args, packageName, version, pinNpmSpecToken);
 }
 
 export function pinMcpServerById(
@@ -75,13 +103,21 @@ export function pinMcpServerById(
       }
       const parsed = parseMcpConfigJson(JSON.stringify({ mcpServers: { [id]: value } }))[0];
       const inferred = parsed ? inferredFromMcpServer(parsed) : null;
-      if (!inferred || inferred.ecosystem !== "npm") {
+      if (!inferred || (inferred.ecosystem !== "npm" && inferred.ecosystem !== "pypi")) {
         next[id] = value;
         continue;
       }
+      if (inferred.ecosystem === "pypi") {
+        const line = [parsed.command, ...parsed.args.map((a) => String(a))].join(" ").toLowerCase();
+        const hasEq = parsed.args.some((a) => typeof a === "string" && /^[A-Za-z0-9_.-]+==/.test(a.trim()));
+        if (!line.includes("uvx") && !line.includes("pipx") && !hasEq) {
+          next[id] = value;
+          continue;
+        }
+      }
       const row = value as Record<string, unknown>;
-      const args = parsed.args;
-      const result = pinNpmArgs(args, inferred.name, version.trim());
+      const pinToken = inferred.ecosystem === "pypi" ? pinPypiSpecToken : pinNpmSpecToken;
+      const result = pinArgsWith(parsed.args, inferred.name, version.trim(), pinToken);
       if (!result.changed) {
         next[id] = value;
         continue;
@@ -104,5 +140,18 @@ export function pinMcpServerById(
       m.servers = pinMap(m.servers as Record<string, unknown>);
     }
   }
-  return { next: pinned ? stringifyMcpConfig(doc) : raw, pinned, packageName, ecosystem };
+  if (!pinned || !packageName) {
+    return { next: raw, pinned: false, packageName, ecosystem };
+  }
+  const surgical = pinPackageTokenInMcpServer(
+    raw,
+    want,
+    packageName,
+    version.trim(),
+    ecosystem === "pypi" ? pinPypiSpecToken : pinNpmSpecToken,
+  );
+  if (surgical.pinned) {
+    return { next: surgical.next, pinned: true, packageName, ecosystem };
+  }
+  return { next: stringifyMcpConfig(doc), pinned: true, packageName, ecosystem };
 }

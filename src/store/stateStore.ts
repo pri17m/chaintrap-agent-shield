@@ -6,6 +6,8 @@ const BASELINE_KEY = "chaintrap.baselines.v1";
 const FINDINGS_KEY = "chaintrap.findings.v1";
 const ACK_KEY = "chaintrap.acks.v1";
 const SESSION_KEY = "chaintrap.sessionStartedAt";
+const LAST_FIX_KEY = "chaintrap.lastFixAt";
+const LAST_CLEARED_KEY = "chaintrap.lastClearedAt";
 
 export class StateStore {
   constructor(private readonly ctx: vscode.ExtensionContext) {}
@@ -47,6 +49,26 @@ export class StateStore {
     }
     const now = new Date().toISOString();
     void this.ctx.workspaceState.update(SESSION_KEY, now);
+    return now;
+  }
+
+  getLastFixAt(): string | undefined {
+    return this.ctx.workspaceState.get<string>(LAST_FIX_KEY);
+  }
+
+  getLastClearedAt(): string | undefined {
+    return this.ctx.workspaceState.get<string>(LAST_CLEARED_KEY);
+  }
+
+  async recordFixApplied(): Promise<string> {
+    const now = new Date().toISOString();
+    await this.ctx.workspaceState.update(LAST_FIX_KEY, now);
+    return now;
+  }
+
+  async recordCleared(): Promise<string> {
+    const now = new Date().toISOString();
+    await this.ctx.workspaceState.update(LAST_CLEARED_KEY, now);
     return now;
   }
 

@@ -23,6 +23,8 @@ export interface InventorySummary {
   workspaceMcpSources: WorkspaceMcpSource[];
   hasOpenFolder: boolean;
   scanning: boolean;
+  lastFixAt?: string;
+  lastClearedAt?: string;
 }
 
 export const EMPTY_INVENTORY_SUMMARY: InventorySummary = {
@@ -155,6 +157,38 @@ export function workspaceMcpSourceLabel(sources: WorkspaceMcpSource[]): string {
   return `Workspace MCP: ${names.join(", ")}`;
 }
 
+export function formatWhen(iso?: string): string | undefined {
+  if (!iso) {
+    return undefined;
+  }
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    return undefined;
+  }
+  return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+export function lastFixHistoryRow(summary: InventorySummary): { label: string; tooltip: string } {
+  const cleared = formatWhen(summary.lastClearedAt);
+  const fixed = formatWhen(summary.lastFixAt);
+  if (cleared && (!summary.lastFixAt || !summary.lastClearedAt || summary.lastClearedAt >= summary.lastFixAt)) {
+    return {
+      label: `Cleared of malware/CVE · ${cleared}`,
+      tooltip: "Last time this workspace had no malicious or vulnerable npm/PyPI or MCP pins after Fix issues or a rescan.",
+    };
+  }
+  if (fixed) {
+    return {
+      label: `Last Fix issues · ${fixed}`,
+      tooltip: "Last time Fix issues wrote the manifest. Malware/CVE may still remain if some rows were skipped.",
+    };
+  }
+  return {
+    label: "Not yet cleared of malware/CVE",
+    tooltip: "Run Fix issues to delete malicious pins and pin/upgrade the rest. This row records when the workspace was last cleared.",
+  };
+}
+
 export function buildPosture(findings: Finding[], summary: InventorySummary = EMPTY_INVENTORY_SUMMARY): PostureModel {
   const attentionBadge = unackedHighCritical(findings);
   const deps = groupDependencyFindings(findings);
@@ -181,7 +215,8 @@ export function buildPosture(findings: Finding[], summary: InventorySummary = EM
     `${checked} checked`,
   ].join(" · ");
 
-  if (summary.scanning) {
+  const inventoryEmpty = checked === 0 && skillRuleCount === 0 && lockfileNotes.length === 0;
+  if (summary.scanning && findings.length === 0 && inventoryEmpty) {
     return {
       scanning: true,
       placeholder: "Scan in progress…",
@@ -192,8 +227,7 @@ export function buildPosture(findings: Finding[], summary: InventorySummary = EM
     };
   }
 
-  const inventoryEmpty = checked === 0 && skillRuleCount === 0 && lockfileNotes.length === 0;
-  if (!summary.hasOpenFolder && inventoryEmpty) {
+  if (!summary.scanning && !summary.hasOpenFolder && inventoryEmpty) {
     return {
       scanning: false,
       placeholder: "No open folder",
@@ -203,7 +237,7 @@ export function buildPosture(findings: Finding[], summary: InventorySummary = EM
       attentionBadge,
     };
   }
-  if (summary.hasOpenFolder && inventoryEmpty) {
+  if (!summary.scanning && summary.hasOpenFolder && inventoryEmpty) {
     return {
       scanning: false,
       placeholder: "Nothing inventoried yet",
@@ -367,6 +401,14 @@ export function buildPosture(findings: Finding[], summary: InventorySummary = EM
       tooltip: "Workspace MCP configs included in this scan.",
     });
   }
+  const history = lastFixHistoryRow(summary);
+  checkedRows.push({
+    id: "lastFix",
+    group: "checked",
+    label: history.label,
+    count: summary.lastClearedAt || summary.lastFixAt ? 1 : 0,
+    tooltip: history.tooltip,
+  });
 
   return {
     scanning: false,

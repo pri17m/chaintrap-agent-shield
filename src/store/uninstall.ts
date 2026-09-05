@@ -1,5 +1,6 @@
 import type { Finding } from "../types";
 import { inferredFromMcpServer, parseMcpConfigJson } from "../scanners/mcpParser";
+import { applyJsonIndent, removeMcpServerEntry } from "./mcpJsonEdit";
 
 /** Drop requirement lines whose package name matches (case-insensitive). */
 export function stripRequirementsLine(raw: string, packageName: string): string {
@@ -29,7 +30,7 @@ export function removePackageJsonDependency(raw: string, packageName: string): s
       delete (block as Record<string, unknown>)[packageName];
     }
   }
-  return JSON.stringify(doc, null, 2) + "\n";
+  return applyJsonIndent(doc, raw);
 }
 
 /** Remove mcpServers / mcp.servers entries whose inferred package matches. */
@@ -73,7 +74,23 @@ function stripMcpServers(
       m.servers = stripMap(m.servers as Record<string, unknown>);
     }
   }
-  return { next: stringifyMcpConfig(doc), removed };
+  if (removed.length === 0) {
+    return { next: raw, removed };
+  }
+  let next = raw;
+  for (const id of removed) {
+    const cut = removeMcpServerEntry(next, id);
+    if (!cut.removed) {
+      return { next: stringifyMcpConfig(doc), removed };
+    }
+    next = cut.next;
+  }
+  try {
+    JSON.parse(next);
+    return { next, removed };
+  } catch {
+    return { next: stringifyMcpConfig(doc), removed };
+  }
 }
 
 /** Pretty-print mcp.json; keep args arrays on one line so uninstall does not look like a syntax/indent break. */

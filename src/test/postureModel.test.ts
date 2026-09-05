@@ -5,6 +5,7 @@ import {
   actionableCoverageGapCount,
   buildPosture,
   EMPTY_INVENTORY_SUMMARY,
+  lastFixHistoryRow,
   summarizeInventory,
   workspaceMcpSourceLabel,
 } from "../ui/postureModel";
@@ -45,7 +46,14 @@ suite("postureModel", () => {
     assert.strictEqual(model.statusText, "Chaintrap: workspace clear");
   });
 
-  test("scanning overrides groups", () => {
+  test("scanning with no inventory is a placeholder", () => {
+    const model = buildPosture([], { ...EMPTY_INVENTORY_SUMMARY, scanning: true });
+    assert.strictEqual(model.placeholder, "Scan in progress…");
+    assert.strictEqual(model.statusText, "Chaintrap: scanning workspace…");
+    assert.strictEqual(model.groups.length, 0);
+  });
+
+  test("scanning with inventory keeps dashboard counts", () => {
     const malicious = finding({
       id: "m",
       surface: "package",
@@ -56,9 +64,25 @@ suite("postureModel", () => {
       title: "This npm package is malicious",
     });
     const model = buildPosture([malicious], { ...checkedSummary, scanning: true });
-    assert.strictEqual(model.placeholder, "Scan in progress…");
+    assert.strictEqual(model.placeholder, undefined);
     assert.strictEqual(model.statusText, "Chaintrap: scanning workspace…");
-    assert.strictEqual(model.groups.length, 0);
+    assert.ok(model.groups.find((g) => g.kind === "attention")?.rows.some((r) => r.id === "maliciousPackages"));
+  });
+
+  test("checked section records last fix and last cleared", () => {
+    assert.strictEqual(lastFixHistoryRow(checkedSummary).label, "Not yet cleared of malware/CVE");
+    const fixed = lastFixHistoryRow({ ...checkedSummary, lastFixAt: "2026-09-05T08:00:00.000Z" });
+    assert.match(fixed.label, /^Last Fix issues · /);
+    const cleared = lastFixHistoryRow({
+      ...checkedSummary,
+      lastFixAt: "2026-09-05T08:00:00.000Z",
+      lastClearedAt: "2026-09-05T08:01:00.000Z",
+    });
+    assert.match(cleared.label, /^Cleared of malware\/CVE · /);
+    const model = buildPosture([], { ...checkedSummary, lastFixAt: "2026-09-05T08:00:00.000Z" });
+    const row = model.groups.find((g) => g.kind === "checked")?.rows.find((r) => r.id === "lastFix");
+    assert.ok(row);
+    assert.match(row!.label, /^Last Fix issues · /);
   });
 
   test("malicious status beats unacked high", () => {

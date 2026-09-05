@@ -18,6 +18,30 @@
 AI-coding supply-chain security for Cursor / VS Code. Chaintrap inventories npm and PyPI pins in the open workspace and in MCP configs, classifies each as malicious packages or vulnerable packages (CVE/GHSA), and surfaces a posture rollup so you can review what the agent pulled in.
 </p>
 
+<h2 style="font-family: Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif; font-weight: 700;">Fix issues</h2>
+
+<p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
+The <b>Fix issues</b> control is the tools icon on <b>Workspace posture</b>, <b>Dependencies</b>, and <b>MCP servers</b>. One click plans the workspace; you confirm before any file is written.
+</p>
+
+<img src="media/screenshots/fix-issues-button.png" alt="Fix issues tools button on the Chaintrap view title">
+
+<p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
+The confirm dialog groups every action and says why:
+</p>
+
+<ul style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
+<li><b>Delete</b> known-bad or OSV malware pins (and that MCP server) from the manifest.</li>
+<li><b>Pin / upgrade</b> unpinned or range specs, and vulnerable exact pins, to the highest OSV-clean version that fits (same major first; later major only if every same-major release is still dirty).</li>
+<li><b>Skip</b> what cannot be edited safely: URL/docker MCP, git/file specs, lockfile-only coverage, or no clean published version.</li>
+</ul>
+
+<p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
+Edits <code>package.json</code>, <code>requirements.txt</code>, and <code>mcp.json</code> only. It does <b>not</b> run <code>npm</code>, <code>npx</code>, or <code>pip</code>. After a write, posture counts refresh from disk and <b>Checked this workspace</b> records when Fix issues last ran and when malware/CVE last hit zero.
+</p>
+
+<img src="media/screenshots/fix-issues-dialog.png" alt="Fix issues confirm dialog: delete malware, pin or upgrade vulnerable and unpinned packages, skip the rest">
+
 <img src="media/screenshots/chaintrap-tree.png" alt="Chaintrap activity bar: Dependencies and MCP servers grouped as malicious, vulnerable, or unpinned">
 
 <h2 style="font-family: Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif; font-weight: 700;">Why this exists</h2>
@@ -56,6 +80,7 @@ Malicious MCP servers are removed from that config by server id. Malicious npm a
 <li>Install <code>pri17m.chaintrap-agent-shield</code>.</li>
 <li>Open a workspace folder. Status bar: <code>Chaintrap: scanning workspace…</code></li>
 <li>Open the Chaintrap activity bar: <b>Workspace posture</b> first (attention, coverage gaps, what was checked), then <b>Dependencies</b> or <b>MCP servers</b>.</li>
+<li>Click <b>Fix issues</b> (tools icon) to delete malware pins and write exact OSV-clean versions. Confirm the dialog first.</li>
 <li>Before trusting an AI agent’s output, run <b>Chaintrap: Review agent changes since last session</b>.</li>
 </ol>
 
@@ -73,6 +98,10 @@ No API key is required for the workspace scan. The extension reads dependency an
 <tr>
 <td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;"><b>Chaintrap: Rescan workspace baseline</b></td>
 <td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;">Run the workspace inventory again</td>
+</tr>
+<tr>
+<td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;"><b>Fix issues</b></td>
+<td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;">Tools icon on posture / Dependencies / MCP: delete malware, pin or upgrade the rest. Manifests only</td>
 </tr>
 <tr>
 <td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;"><b>Chaintrap: Show workspace posture</b></td>

@@ -16,9 +16,9 @@ import { AgentActivityProvider } from "./agentActivityTree";
 
 import { countUnackedHighCritical } from "./findingCopy";
 
-import { isManifestPackage, isMcpServerFinding } from "./findingGroups";
+import { isMaliciousFinding, isManifestPackage, isMcpServerFinding, isVulnerablePackageFinding } from "./findingGroups";
 
-import { applyDeltaFindings, replaceBaselineFindings, scopeFindingsForDisplay, skipKeysCoveredByFindings } from "./findingMerge";
+import { applyDeltaFindings, isSameActionTarget, replaceBaselineFindings, scopeFindingsForDisplay, skipKeysCoveredByFindings } from "./findingMerge";
 
 import { EMPTY_INVENTORY_SUMMARY, buildPosture, summarizeInventory, type InventorySummary } from "./postureModel";
 
@@ -65,6 +65,18 @@ export class ShieldController {
   private deltaRunning = false;
 
   private lastSummary: InventorySummary = { ...EMPTY_INVENTORY_SUMMARY };
+
+  private withHistory(summary: InventorySummary): InventorySummary {
+    return {
+      ...summary,
+      lastFixAt: this.store.getLastFixAt(),
+      lastClearedAt: this.store.getLastClearedAt(),
+    };
+  }
+
+  private scanEpoch = 0;
+
+  private baselineWanted = false;
 
 
 
@@ -184,6 +196,16 @@ export class ShieldController {
 
     this.applyPosture(shown);
 
+    const mal = shown.filter(isMaliciousFinding).length;
+    const vuln = shown.filter(isVulnerablePackageFinding).length;
+    const lastFix = this.store.getLastFixAt();
+    const lastCleared = this.store.getLastClearedAt();
+    if (mal === 0 && vuln === 0 && lastFix && (!lastCleared || lastCleared < lastFix)) {
+      await this.store.recordCleared();
+      this.lastSummary = this.withHistory(this.lastSummary);
+      this.applyPosture(shown);
+    }
+
     if (promptAck) {
 
       await promptCriticalAcks(this.store, shown);
@@ -201,6 +223,37 @@ export class ShieldController {
       this.applyPosture(shownAfter);
 
     }
+
+  }
+
+
+
+  /** Drop the acted-on finding immediately so Problems/posture do not keep asking. */
+
+  async dismissActionedFinding(finding: Finding, roots?: readonly vscode.WorkspaceFolder[]): Promise<void> {
+
+    await this.dismissActionedFindings([finding], roots);
+
+  }
+
+
+
+  async dismissActionedFindings(findings: Finding[], roots?: readonly vscode.WorkspaceFolder[]): Promise<void> {
+
+    this.scanEpoch += 1;
+
+    const openRoots = roots ? this.openRootPaths(roots) : this.openRootPaths(vscode.workspace.workspaceFolders || []);
+
+    const next = this.store.getFindings().filter((f) => !findings.some((acted) => isSameActionTarget(f, acted)));
+
+    const folders = roots || vscode.workspace.workspaceFolders || [];
+    const items = [
+      ...inventoryUserConfig(),
+      ...[...folders].map((folder) => inventoryWorkspaceRoot(folder.uri.fsPath)).flat(),
+    ];
+    this.lastSummary = this.withHistory(summarizeInventory(items, openRoots.length > 0));
+
+    await this.publish(next, openRoots, false);
 
   }
 
@@ -230,6 +283,8 @@ export class ShieldController {
 
     if (this.baselineRunning) {
 
+      this.baselineWanted = true;
+
       return;
 
     }
@@ -237,6 +292,28 @@ export class ShieldController {
     this.baselineRunning = true;
 
     try {
+
+      do {
+
+        this.baselineWanted = false;
+
+        const epoch = this.scanEpoch;
+
+        await this.runBaselinePass(roots, epoch);
+
+      } while (this.baselineWanted);
+
+    } finally {
+
+      this.baselineRunning = false;
+
+    }
+
+  }
+
+
+
+  private async runBaselinePass(roots: readonly vscode.WorkspaceFolder[], epoch: number): Promise<void> {
 
       this.status.text = "Chaintrap: scanning workspace…";
 
@@ -281,7 +358,15 @@ export class ShieldController {
 
 
 
-      this.lastSummary = summarizeInventory(allItems, openRoots.length > 0);
+      this.lastSummary = this.withHistory(summarizeInventory(allItems, openRoots.length > 0));
+
+      if (epoch !== this.scanEpoch) {
+
+        this.baselineWanted = true;
+
+        return;
+
+      }
 
       const merged = replaceBaselineFindings(this.store.getFindings(), findings, this.store.getAcks(), openRoots, {
 
@@ -302,12 +387,6 @@ export class ShieldController {
         void vscode.window.showWarningMessage(`Chaintrap baseline found ${crit} critical issue(s).`);
 
       }
-
-    } finally {
-
-      this.baselineRunning = false;
-
-    }
 
   }
 
@@ -396,7 +475,7 @@ export class ShieldController {
 
       }
 
-      this.lastSummary = summarizeInventory(liveItems, openRoots.length > 0);
+      this.lastSummary = this.withHistory(summarizeInventory(liveItems, openRoots.length > 0));
 
       if (deltaItems.length === 0) {
 

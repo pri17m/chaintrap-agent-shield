@@ -11,6 +11,10 @@
     "docs": {
       "command": "npx",
       "args": ["-y", "chrome-devtools-mcp"]
+    },
+    "ado": {
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "pri17m"]
     }
   }
 }

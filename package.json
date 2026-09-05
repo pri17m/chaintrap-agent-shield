@@ -1,8 +1,8 @@
 {
   "name": "chaintrap-agent-shield",
   "displayName": "Chaintrap Agent Shield — AI-Coding Security",
-  "description": "AI-coding supply-chain security: scan dependencies + MCP server packages (npm/PyPI), flag malware/CVEs, and remove malicious pins in-editor.",
-  "version": "0.1.27",
+  "description": "AI-coding supply-chain security: scan npm/PyPI and MCP pins, flag malware and CVEs, then Fix issues — delete known-bad pins and write exact OSV-clean versions. Manifest edits only.",
+  "version": "0.1.33",
   "publisher": "pri17m",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -84,6 +84,11 @@
       {
         "command": "chaintrap.explainCoverageGap",
         "title": "Chaintrap: Explain coverage gap"
+      },
+      {
+        "command": "chaintrap.fixIssues",
+        "title": "Fix issues",
+        "icon": "$(tools)"
       }
     ],
     "viewsContainers": {
@@ -112,6 +117,13 @@
       ]
     },
     "menus": {
+      "view/title": [
+        {
+          "command": "chaintrap.fixIssues",
+          "when": "view == chaintrap.posture || view == chaintrap.activity || view == chaintrap.mcp",
+          "group": "navigation"
+        }
+      ],
       "view/item/context": [
         {
           "command": "chaintrap.uninstallMaliciousPackage",

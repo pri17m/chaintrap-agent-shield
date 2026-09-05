@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.1.33
+
+- Marketplace listing: **Fix issues** section with the tools-button and confirm-dialog screenshots
+- Listing copy: delete malware, pin/upgrade CVE and unpinned MCP, skip what cannot be edited; manifests only
+
+## 0.1.32
+
+- PyPI Fix issues understands two-part versions (`Markdown==3.8`) and `.postN` releases
+- Vulnerable pins with no clean same-major release can move to a later major (e.g. Jinja2 2.10.1 → 3.1.6)
+
+## 0.1.31
+
+- npx MCP inference uses the first package token (including unversioned `@scope/name`). Extra args such as an org name are not treated as the package
+
+## 0.1.30
+
+- Fix issues confirm dialog groups delete / pin / skip and says why (malicious, unpinned, range, or CVE)
+- Workspace posture keeps counts visible after a fix (no scan wipe) and re-inventories so Attention / Coverage numbers match the files
+- Checked this workspace shows when Fix issues last ran and when the workspace was last cleared of malware/CVE
+
+## 0.1.29
+
+- **Fix issues** on posture, Dependencies, and MCP servers: one confirm, then delete malicious pins, pin unpinned/range specs to the highest OSV-clean version in-range, and upgrade vulnerable exact pins within the same major
+- Still manifest-only (no npm/npx/pip); skip unchecked MCP, git/file specs, and packages with no clean version
+
+## 0.1.28
+
+- Pin unpinned MCP: choose **Pin latest (x.y.z)** (the published latest, or the version already resolved on scan) or type another exact version
+- Pin/uninstall edit only the acted-on server (or dep) and keep the file's indent and surrounding entries
+- After pin or uninstall, that finding is dropped from Problems and posture immediately so the same row is not acted on twice
+
 ## 0.1.27
 
 - Unpinned MCP servers: look up the latest npm/PyPI version and classify that version (malware → Malicious, CVE/GHSA → Vulnerable). Copy says unpinned; latest is X — not what npx will install tomorrow

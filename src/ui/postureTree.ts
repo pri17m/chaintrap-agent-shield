@@ -8,14 +8,16 @@ export class PostureProvider implements vscode.TreeDataProvider<PostureGroupItem
   >();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
   private model: PostureModel = buildPosture([], { ...EMPTY_INVENTORY_SUMMARY, scanning: true });
+  private lastFindings: Finding[] = [];
 
   refresh(findings: Finding[], summary: InventorySummary): void {
+    this.lastFindings = findings;
     this.model = buildPosture(findings, summary);
     this._onDidChangeTreeData.fire(undefined);
   }
 
   setScanning(summary: InventorySummary): void {
-    this.refresh([], { ...summary, scanning: true });
+    this.refresh(this.lastFindings, { ...summary, scanning: true });
   }
 
   getTreeItem(element: PostureGroupItem | PostureRowItem | PosturePlaceholderItem): vscode.TreeItem {

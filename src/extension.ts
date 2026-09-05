@@ -8,6 +8,7 @@ import { ShieldController } from "./ui/controller";
 import { needsAckPopup } from "./ui/findingCopy";
 import { PostureProvider } from "./ui/postureTree";
 import { groupMcpFindings } from "./ui/findingGroups";
+import { runFixIssues } from "./ui/fixIssuesFlow";
 import { pinMcpFinding } from "./ui/pinFlow";
 import { uninstallMaliciousFinding } from "./ui/uninstallFlow";
 import { ProblemsReporter } from "./ui/problems";
@@ -126,6 +127,8 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       const ok = await uninstallMaliciousFinding(finding);
       if (ok) {
+        await store.recordFixApplied();
+        await controller.dismissActionedFinding(finding, folders());
         await controller.runBaseline(folders());
       }
     }),
@@ -168,6 +171,16 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       const ok = await pinMcpFinding(finding);
       if (ok) {
+        await store.recordFixApplied();
+        await controller.dismissActionedFinding(finding, folders());
+        await controller.runBaseline(folders());
+      }
+    }),
+    vscode.commands.registerCommand("chaintrap.fixIssues", async () => {
+      const applied = await runFixIssues(store.getFindings());
+      if (applied && applied.length > 0) {
+        await store.recordFixApplied();
+        await controller.dismissActionedFindings(applied, folders());
         await controller.runBaseline(folders());
       }
     }),

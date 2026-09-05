@@ -15,26 +15,59 @@ export function isOutOfScopeFinding(f: Finding, openRoots: readonly string[]): b
   return !openRoots.some((r) => f.workspaceRoot === r);
 }
 
+export function isSameActionTarget(existing: Finding, acted: Finding): boolean {
+  if (existing.id === acted.id) {
+    return true;
+  }
+  if (existing.path !== acted.path) {
+    return false;
+  }
+  if (acted.surface === "mcp" && existing.surface === "mcp") {
+    return Boolean(acted.mcpId && existing.mcpId === acted.mcpId);
+  }
+  if (acted.surface === "package" && existing.surface === "package") {
+    return Boolean(acted.packageName && existing.packageName === acted.packageName);
+  }
+  return false;
+}
+
+function mcpItemForFinding(f: Finding, liveItems: readonly InventoryItem[]): InventoryItem | undefined {
+  return liveItems.find((i) => i.kind === "mcp" && i.path === f.path && i.mcpId === f.mcpId);
+}
+
 export function liveInventoryKeyForFinding(f: Finding, liveItems: readonly InventoryItem[]): string | undefined {
   const name = (f.packageName || "").toLowerCase();
   const ver = f.version || "";
-  return liveItems.find((i) => {
-    if (f.coverageNote) {
-      return i.kind === "coverage" && i.path === f.path && i.ecosystem === f.ecosystem;
+  if (f.coverageKind === "unchecked-mcp") {
+    const item = mcpItemForFinding(f, liveItems);
+    return item && !item.packageName ? item.key : undefined;
+  }
+  if (f.coverageNote) {
+    return liveItems.find((i) => i.kind === "coverage" && i.path === f.path && i.ecosystem === f.ecosystem)?.key;
+  }
+  if (f.surface === "mcp") {
+    const item = mcpItemForFinding(f, liveItems);
+    if (!item) {
+      return undefined;
     }
+    const findingUnpinned = !f.version || f.version === "unknown";
+    const itemUnpinned = !item.version || item.version === "unknown";
+    if (findingUnpinned) {
+      return itemUnpinned && (item.packageName || "").toLowerCase() === name ? item.key : undefined;
+    }
+    if ((item.packageName || "").toLowerCase() !== name || (item.version || "") !== ver) {
+      return undefined;
+    }
+    return item.key;
+  }
+  return liveItems.find((i) => {
     if (i.path !== f.path) {
       return false;
     }
     if ((i.packageName || "").toLowerCase() !== name || (i.version || "") !== ver) {
       return false;
     }
-    if (f.surface === "mcp") {
-      return i.kind === "mcp" && i.mcpId === f.mcpId;
-    }
-    if (f.surface === "package") {
-      return i.kind === "package";
-    }
-    return false;
+    return i.kind === "package";
   })?.key;
 }
 
@@ -104,6 +137,12 @@ export function applyDeltaFindings(
   for (const f of byId.values()) {
     if (isOutOfScopeFinding(f, openRoots)) {
       out.push(f);
+      continue;
+    }
+    if (f.coverageKind === "unchecked-mcp" && liveItems) {
+      if (liveInventoryKeyForFinding(f, liveItems)) {
+        out.push(f);
+      }
       continue;
     }
     if (f.coverageNote && liveItems) {

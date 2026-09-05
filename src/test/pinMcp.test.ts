@@ -32,7 +32,21 @@ suite("pinMcp", () => {
     const doc = JSON.parse(next) as { mcpServers: { docs: { args: string[] }; lodash: { args: string[] } } };
     assert.deepStrictEqual(doc.mcpServers.docs.args, ["-y", "chrome-devtools-mcp@0.4.0"]);
     assert.deepStrictEqual(doc.mcpServers.lodash.args, ["-y", "lodash@4.17.20"]);
-    assert.match(next, /"args": \["-y", "chrome-devtools-mcp@0\.4\.0"\]/);
+    assert.match(next, /chrome-devtools-mcp@0\.4\.0/);
+    assert.ok(!next.includes("\n"), "compact source stays compact");
+  });
+
+  test("pinMcpServerById pins scoped package and leaves extra npx args", () => {
+    const raw = JSON.stringify({
+      mcpServers: {
+        ado: { command: "npx", args: ["-y", "@azure-devops/mcp", "pri17m"] },
+      },
+    });
+    const { next, pinned, packageName } = pinMcpServerById(raw, "ado", "1.2.3");
+    assert.strictEqual(pinned, true);
+    assert.strictEqual(packageName, "@azure-devops/mcp");
+    const doc = JSON.parse(next) as { mcpServers: { ado: { args: string[] } } };
+    assert.deepStrictEqual(doc.mcpServers.ado.args, ["-y", "@azure-devops/mcp@1.2.3", "pri17m"]);
   });
 
   test("pinMcpServerById no-ops unknown id or python -m", () => {
