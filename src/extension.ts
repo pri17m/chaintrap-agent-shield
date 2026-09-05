@@ -7,6 +7,8 @@ import { AgentActivityProvider, FindingItem } from "./ui/agentActivityTree";
 import { ShieldController } from "./ui/controller";
 import { needsAckPopup } from "./ui/findingCopy";
 import { PostureProvider } from "./ui/postureTree";
+import { groupMcpFindings } from "./ui/findingGroups";
+import { pinMcpFinding } from "./ui/pinFlow";
 import { uninstallMaliciousFinding } from "./ui/uninstallFlow";
 import { ProblemsReporter } from "./ui/problems";
 import { createWatchers } from "./watchers/fileWatchers";
@@ -123,6 +125,46 @@ export function activate(context: vscode.ExtensionContext): void {
         return;
       }
       const ok = await uninstallMaliciousFinding(finding);
+      if (ok) {
+        await controller.runBaseline(folders());
+      }
+    }),
+    vscode.commands.registerCommand("chaintrap.explainCoverageGap", async (kind?: string) => {
+      if (kind === "skills") {
+        void vscode.window.showInformationMessage(
+          "Skills and rules are listed for coverage only. They are not scanned and cannot be pinned.",
+        );
+        return;
+      }
+      void vscode.window.showInformationMessage("Click a coverage row for the action that applies to that gap.");
+    }),
+    vscode.commands.registerCommand("chaintrap.pinMcpServerVersion", async (item?: FindingItem) => {
+      let finding = item?.finding;
+      if (!finding) {
+        const unpinned = groupMcpFindings(store.getFindings()).unpinned;
+        if (unpinned.length === 0) {
+          void vscode.window.showInformationMessage("No unpinned MCP servers in this workspace.");
+          return;
+        }
+        if (unpinned.length === 1) {
+          finding = unpinned[0];
+        } else {
+          const picked = await vscode.window.showQuickPick(
+            unpinned.map((f) => ({
+              label: f.mcpId || f.packageName || f.id,
+              description: f.packageName,
+              detail: f.path,
+              finding: f,
+            })),
+            { title: "Pin which MCP server?", placeHolder: "Writes package@version into mcp.json" },
+          );
+          finding = picked?.finding;
+        }
+      }
+      if (!finding) {
+        return;
+      }
+      const ok = await pinMcpFinding(finding);
       if (ok) {
         await controller.runBaseline(folders());
       }

@@ -10,36 +10,7 @@ import {
   stripRequirementsLine,
   uninstallConfirmLabel,
 } from "../store/uninstall";
-
-function sameFsPath(a: string, b: string): boolean {
-  return path.normalize(a).toLowerCase() === path.normalize(b).toLowerCase();
-}
-
-function readTextFile(filePath: string): string {
-  const open = vscode.workspace.textDocuments.find((d) => sameFsPath(d.uri.fsPath, filePath));
-  if (open) {
-    return open.getText();
-  }
-  return fs.readFileSync(filePath, "utf8");
-}
-
-async function writeTextFile(filePath: string, contents: string): Promise<void> {
-  const uri = vscode.Uri.file(filePath);
-  const open = vscode.workspace.textDocuments.find((d) => sameFsPath(d.uri.fsPath, filePath));
-  if (open) {
-    const edit = new vscode.WorkspaceEdit();
-    const end = open.lineAt(Math.max(open.lineCount - 1, 0)).range.end;
-    edit.replace(open.uri, new vscode.Range(new vscode.Position(0, 0), end), contents);
-    const ok = await vscode.workspace.applyEdit(edit);
-    if (ok) {
-      if (open.isDirty) {
-        await open.save();
-      }
-      return;
-    }
-  }
-  await vscode.workspace.fs.writeFile(uri, Buffer.from(contents, "utf8"));
-}
+import { readWorkspaceText, writeWorkspaceText } from "./workspaceText";
 
 function findManifest(finding: Finding, fileName: string): string | undefined {
   if (path.basename(finding.path).toLowerCase() === fileName.toLowerCase() && fs.existsSync(finding.path)) {
@@ -72,7 +43,7 @@ export async function uninstallMaliciousFinding(finding: Finding): Promise<boole
 
   try {
     if (finding.surface === "mcp") {
-      const raw = readTextFile(finding.path);
+      const raw = readWorkspaceText(finding.path);
       const { next, removed } = finding.mcpId
         ? removeMcpServerById(raw, finding.mcpId)
         : removeMcpServerByPackage(raw, finding.packageName);
@@ -80,7 +51,7 @@ export async function uninstallMaliciousFinding(finding: Finding): Promise<boole
         void vscode.window.showWarningMessage(`Could not find an MCP server for ${finding.mcpId || finding.packageName}.`);
         return false;
       }
-      await writeTextFile(finding.path, next);
+      await writeWorkspaceText(finding.path, next);
       void vscode.window.showInformationMessage(`Removed MCP server(s): ${removed.join(", ")}.`);
       return true;
     }
@@ -91,8 +62,8 @@ export async function uninstallMaliciousFinding(finding: Finding): Promise<boole
         void vscode.window.showWarningMessage(`No requirements.txt found to remove ${finding.packageName}.`);
         return false;
       }
-      const next = stripRequirementsLine(readTextFile(req), finding.packageName);
-      await writeTextFile(req, next);
+      const next = stripRequirementsLine(readWorkspaceText(req), finding.packageName);
+      await writeWorkspaceText(req, next);
       void vscode.window.showInformationMessage(`Removed ${finding.packageName} from requirements.`);
       return true;
     }
@@ -103,8 +74,8 @@ export async function uninstallMaliciousFinding(finding: Finding): Promise<boole
         void vscode.window.showWarningMessage(`No package.json found to remove ${finding.packageName}.`);
         return false;
       }
-      const next = removePackageJsonDependency(readTextFile(pkgJson), finding.packageName);
-      await writeTextFile(pkgJson, next);
+      const next = removePackageJsonDependency(readWorkspaceText(pkgJson), finding.packageName);
+      await writeWorkspaceText(pkgJson, next);
       void vscode.window.showInformationMessage(`Removed ${finding.packageName} from package.json.`);
       return true;
     }

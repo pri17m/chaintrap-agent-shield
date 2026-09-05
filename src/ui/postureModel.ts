@@ -261,8 +261,8 @@ export function buildPosture(findings: Finding[], summary: InventorySummary = EM
       group: "coverage",
       label: `Unpinned MCP servers (${unpinned.length})`,
       count: unpinned.length,
-      tooltip: "No version in the server config, so the pin could not be checked.",
-      command: { command: "chaintrap.mcp.focus", title: "Show MCP servers" },
+      tooltip: "No version in the server config. Click to pin an exact version in mcp.json.",
+      command: { command: "chaintrap.pinMcpServerVersion", title: "Pin MCP version" },
     });
   }
   if (unverified.length > 0) {
@@ -271,7 +271,8 @@ export function buildPosture(findings: Finding[], summary: InventorySummary = EM
       group: "coverage",
       label: `Could not verify online (${unverified.length})`,
       count: unverified.length,
-      tooltip: "OSV was unreachable. Unknown packages are not treated as safe.",
+      tooltip: "OSV was unreachable. Unknown packages are not treated as safe. Click to rescan.",
+      command: { command: "chaintrap.rescanBaseline", title: "Rescan workspace" },
     });
   }
   if (skillRuleCount > 0) {
@@ -281,6 +282,7 @@ export function buildPosture(findings: Finding[], summary: InventorySummary = EM
       label: `Skills/rules inventoried, not analyzed (${skillRuleCount})`,
       count: skillRuleCount,
       tooltip: "Skill and rule files are listed for coverage. Heuristics stay off to avoid false positives.",
+      command: { command: "chaintrap.explainCoverageGap", title: "Explain coverage gap", arguments: ["skills"] },
     });
   }
 

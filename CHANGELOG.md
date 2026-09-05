@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.25
+
+- Coverage gaps are clickable: pin unpinned MCP servers to an exact version in `mcp.json` (no npm/npx spawn)
+- Pin action on unpinned MCP rows (inline and context menu)
+
 ## 0.1.24
 
 - Workspace posture tree at the top of the Chaintrap activity bar (attention, coverage gaps, what was checked)

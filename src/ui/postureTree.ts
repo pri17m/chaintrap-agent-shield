@@ -73,5 +73,8 @@ export class PostureRowItem extends vscode.TreeItem {
     if (row.command) {
       this.command = row.command;
     }
+    if (row.id === "unpinnedMcp") {
+      this.description = "Pin";
+    }
   }
 }

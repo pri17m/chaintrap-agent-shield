@@ -149,6 +149,10 @@ suite("postureModel", () => {
     const coverage = model.groups.find((g) => g.kind === "coverage");
     assert.ok(coverage?.rows.some((r) => r.id === "noLockfile"));
     assert.ok(coverage?.rows.some((r) => r.id === "unpinnedMcp"));
+    assert.strictEqual(
+      coverage?.rows.find((r) => r.id === "unpinnedMcp")?.command?.command,
+      "chaintrap.pinMcpServerVersion",
+    );
     assert.ok(coverage?.rows.some((r) => r.id === "unverified"));
     assert.ok(!coverage?.rows.some((r) => r.id === "skillsNotAnalyzed"));
   });
@@ -176,6 +180,10 @@ suite("postureModel", () => {
     assert.strictEqual(model.statusText, "Chaintrap: 7 packages checked");
     const coverage = model.groups.find((g) => g.kind === "coverage");
     assert.ok(coverage?.rows.some((r) => r.id === "skillsNotAnalyzed" && r.count === 5));
+    assert.strictEqual(
+      coverage?.rows.find((r) => r.id === "skillsNotAnalyzed")?.command?.command,
+      "chaintrap.explainCoverageGap",
+    );
     assert.strictEqual(actionableCoverageGapCount([]), 0);
   });
 

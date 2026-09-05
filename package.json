@@ -2,7 +2,7 @@
   "name": "chaintrap-agent-shield",
   "displayName": "Chaintrap Agent Shield — AI-Coding Security",
   "description": "AI-coding supply-chain security: scan dependencies + MCP server packages (npm/PyPI), flag malware/CVEs, and remove malicious pins in-editor.",
-  "version": "0.1.24",
+  "version": "0.1.25",
   "publisher": "pri17m",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -76,6 +76,14 @@
       {
         "command": "chaintrap.uninstallMaliciousPackage",
         "title": "Chaintrap: Uninstall malicious package"
+      },
+      {
+        "command": "chaintrap.pinMcpServerVersion",
+        "title": "Chaintrap: Pin MCP package version"
+      },
+      {
+        "command": "chaintrap.explainCoverageGap",
+        "title": "Chaintrap: Explain coverage gap"
       }
     ],
     "viewsContainers": {
@@ -124,6 +132,26 @@
           "command": "chaintrap.uninstallMaliciousPackage",
           "when": "view == chaintrap.mcp && viewItem == maliciousMcpServer",
           "group": "0_actions"
+        },
+        {
+          "command": "chaintrap.pinMcpServerVersion",
+          "when": "view == chaintrap.mcp && viewItem == unpinnedMcpServer",
+          "group": "inline"
+        },
+        {
+          "command": "chaintrap.pinMcpServerVersion",
+          "when": "view == chaintrap.mcp && viewItem == unpinnedMcpServer",
+          "group": "0_actions"
+        },
+        {
+          "command": "chaintrap.pinMcpServerVersion",
+          "when": "view == chaintrap.posture && viewItem == postureRow.unpinnedMcp",
+          "group": "inline"
+        },
+        {
+          "command": "chaintrap.pinMcpServerVersion",
+          "when": "view == chaintrap.posture && viewItem == postureRow.unpinnedMcp",
+          "group": "0_actions"
         }
       ]
     },
@@ -159,7 +187,7 @@
   "devDependencies": {
     "@types/mocha": "10.0.10",
     "@types/node": "20.19.43",
-    "@types/vscode": "1.136.0",
+    "@types/vscode": "1.85.0",
     "@vscode/vsce": "3.9.2",
     "mocha": "12.0.0",
     "typescript": "5.9.3"

@@ -74,7 +74,7 @@ export class GroupItem extends vscode.TreeItem {
           ? "MCP server config pulls a known-bad or malware package. Right-click to remove the server."
           : "Known-bad or malware package. Right-click a package to uninstall.";
     } else if (kind === "unpinned") {
-      this.tooltip = "No version in the server config, so the pin could not be checked.";
+      this.tooltip = "No version in the server config. Pin an exact version so the package can be checked.";
     }
   }
 }
