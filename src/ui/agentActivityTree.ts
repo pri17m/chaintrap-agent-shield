@@ -3,7 +3,7 @@ import type { Finding, Surface } from "../types";
 import { findingTreeCommand, shortPath } from "./findingCopy";
 import { groupDependencyFindings, groupMcpFindings } from "./findingGroups";
 
-export type ActivityKind = "malicious" | "vulnerable" | "unpinned";
+export type ActivityKind = "malicious" | "vulnerable" | "unpinned" | "unchecked";
 export type TreeSurface = Extract<Surface, "package" | "mcp">;
 
 export class AgentActivityProvider implements vscode.TreeDataProvider<FindingItem | GroupItem> {
@@ -30,6 +30,7 @@ export class AgentActivityProvider implements vscode.TreeDataProvider<FindingIte
           new GroupItem("malicious", "mcp", `Malicious MCP servers (${grouped.malicious.length})`),
           new GroupItem("vulnerable", "mcp", `Vulnerable MCP servers (${grouped.vulnerable.length})`),
           new GroupItem("unpinned", "mcp", `Unpinned MCP servers (${grouped.unpinned.length})`),
+          new GroupItem("unchecked", "mcp", `Unchecked MCP servers (${grouped.unchecked.length})`),
         ];
       }
       if (element instanceof GroupItem) {
@@ -38,7 +39,9 @@ export class AgentActivityProvider implements vscode.TreeDataProvider<FindingIte
             ? grouped.malicious
             : element.kind === "vulnerable"
               ? grouped.vulnerable
-              : grouped.unpinned;
+              : element.kind === "unpinned"
+                ? grouped.unpinned
+                : grouped.unchecked;
         return list.map((f) => new FindingItem(f, element.kind, "mcp"));
       }
       return [];
@@ -67,14 +70,23 @@ export class GroupItem extends vscode.TreeItem {
   ) {
     super(label, vscode.TreeItemCollapsibleState.Expanded);
     this.contextValue =
-      kind === "malicious" ? "maliciousGroup" : kind === "vulnerable" ? "vulnerableGroup" : "unpinnedGroup";
+      kind === "malicious"
+        ? "maliciousGroup"
+        : kind === "vulnerable"
+          ? "vulnerableGroup"
+          : kind === "unpinned"
+            ? "unpinnedGroup"
+            : "uncheckedGroup";
     if (kind === "malicious") {
       this.tooltip =
         surface === "mcp"
           ? "MCP server config pulls a known-bad or malware package. Right-click to remove the server."
           : "Known-bad or malware package. Right-click a package to uninstall.";
     } else if (kind === "unpinned") {
-      this.tooltip = "No version in the server config. Pin an exact version so the package can be checked.";
+      this.tooltip =
+        "No exact version in the server config. Latest published on npm/PyPI is checked when the registry is reachable.";
+    } else if (kind === "unchecked") {
+      this.tooltip = "URL, docker, or binary MCP servers — not npm/PyPI packages, so they are listed only.";
     }
   }
 }
@@ -93,8 +105,10 @@ export class FindingItem extends vscode.TreeItem {
           : finding.title;
     super(name, vscode.TreeItemCollapsibleState.None);
     if (surface === "mcp") {
-      const pkg = finding.packageName ? `${finding.packageName}@${finding.version || "?"}` : "package";
-      this.description = `${pkg} · ${shortPath(finding.path)}`;
+      const detail = finding.packageName
+        ? `${finding.packageName}@${finding.version || "?"}`
+        : finding.mcpUrl || finding.mcpCommand || "not a package";
+      this.description = `${detail} · ${shortPath(finding.path)}`;
     } else {
       const eco = finding.ecosystem === "pypi" ? "PyPI" : finding.ecosystem === "npm" ? "npm" : finding.surface;
       this.description = `${eco} · ${finding.source} · ${shortPath(finding.path)}`;
@@ -106,6 +120,8 @@ export class FindingItem extends vscode.TreeItem {
       this.contextValue = surface === "mcp" ? "maliciousMcpServer" : "maliciousPackage";
     } else if (kind === "vulnerable") {
       this.contextValue = "vulnerablePackage";
+    } else if (kind === "unchecked") {
+      this.contextValue = "uncheckedMcpServer";
     } else {
       this.contextValue = finding.ecosystem === "npm" ? "unpinnedMcpServer" : "unpinnedMcpOther";
     }

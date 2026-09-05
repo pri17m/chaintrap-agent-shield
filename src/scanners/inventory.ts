@@ -11,7 +11,7 @@ import {
   parseTomlPackageTables,
   parseYarnLockBody,
 } from "./lockfileParsers";
-import { inferredFromMcpServer, parseMcpConfigJson } from "./mcpParser";
+import { formatMcpInvocation, inferredFromMcpServer, parseMcpConfigJson } from "./mcpParser";
 import { isExactNpmSpec, isExactPypiRequirement, pypiRequirementName } from "./pinSpec";
 
 export { parsePnpmPackageKey, parseYarnLockBody };
@@ -277,6 +277,7 @@ function parseMcpFile(filePath: string, workspaceRoot: string | undefined, items
       pinExact = true;
     }
     const key = `mcp:${filePath}:${server.id}`;
+    const command = formatMcpInvocation(server);
     items.push({
       key,
       kind: "mcp",
@@ -289,6 +290,8 @@ function parseMcpFile(filePath: string, workspaceRoot: string | undefined, items
       ecosystem: inferred?.ecosystem,
       pinExact,
       spec,
+      mcpCommand: command || undefined,
+      mcpUrl: server.url || undefined,
     });
   }
 }

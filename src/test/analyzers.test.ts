@@ -1113,20 +1113,24 @@ suite("findingGroups", () => {
     );
   });
 
-  test("MCP config without inferred package stays out of both trees", () => {
+  test("MCP config without inferred package is Unchecked, not malware or unpinned", () => {
     const orphan = f({
       id: "orphan",
       surface: "mcp",
       packageName: undefined,
       mcpId: "stdio-only",
       path: "/repo/.cursor/mcp.json",
-      malicious: true,
-      severity: "critical",
+      mcpCommand: "docker run example.invalid/mcp",
+      severity: "info",
     });
     assert.deepStrictEqual(groupDependencyFindings([orphan]).malicious, []);
     assert.deepStrictEqual(groupMcpFindings([orphan]).malicious, []);
     assert.deepStrictEqual(groupMcpFindings([orphan]).vulnerable, []);
     assert.deepStrictEqual(groupMcpFindings([orphan]).unpinned, []);
+    assert.deepStrictEqual(
+      groupMcpFindings([orphan]).unchecked.map((x) => x.id),
+      ["orphan"],
+    );
   });
 
   test("unpinned MCP finding is not in Dependencies groups", () => {

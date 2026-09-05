@@ -59,7 +59,7 @@ suite("pinSpec honesty", () => {
     assert.ok(!model.groups.find((g) => g.kind === "coverage")?.rows.some((r) => r.id === "unverified"));
   });
 
-  test("MCP @latest is a coverage gap and is not sent to OSV", async () => {
+  test("MCP @latest is not sent to OSV as the string latest", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "inv-mcp-latest-"));
     fs.mkdirSync(path.join(root, ".cursor"), { recursive: true });
     fs.writeFileSync(
@@ -71,14 +71,24 @@ suite("pinSpec honesty", () => {
     const mcp = items.find((i) => i.kind === "mcp" && i.mcpId === "docs");
     assert.strictEqual(mcp?.version, "unknown");
     assert.strictEqual(mcp?.pinExact, false);
-    let osvCalled = false;
-    await analyzeItems(items, "baseline", async (url) => {
-      if (String(url).includes("querybatch")) {
-        osvCalled = true;
+    let posted = "";
+    const findings = await analyzeItems(items, "baseline", async (url, init) => {
+      const href = String(url);
+      if (href.includes("registry.npmjs.org")) {
+        return { ok: true, json: async () => ({ version: "4.17.21" }) } as Response;
       }
-      return { ok: true, json: async () => ({ results: [{}] }) } as Response;
+      if (href.includes("querybatch")) {
+        posted = String(init?.body || "");
+        return { ok: true, json: async () => ({ results: [{}] }) } as Response;
+      }
+      return { ok: true, json: async () => ({}) } as Response;
     });
-    assert.strictEqual(osvCalled, false);
+    const body = JSON.parse(posted) as { queries: Array<{ version: string }> };
+    assert.strictEqual(body.queries[0].version, "4.17.21");
+    assert.ok(!posted.includes("latest"));
+    const unpinned = findings.find((f) => f.mcpId === "docs" && f.version === "unknown");
+    assert.ok(unpinned);
+    assert.strictEqual(unpinned!.resolvedVersion, "4.17.21");
   });
 
   test("pypi range line is not treated as == pin", () => {

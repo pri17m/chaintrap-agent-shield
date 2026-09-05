@@ -17,9 +17,11 @@ export interface InventoryItem {
   pinExact?: boolean;
   /** Original manifest spec when pinExact is false (e.g. ^4.17.21). */
   spec?: string;
-  coverageKind?: "no-lockfile" | "not-exact";
+  coverageKind?: "no-lockfile" | "not-exact" | "unchecked-mcp";
   /** Ephemeral UTF-8 body for the current scan pass — never persist. */
   content?: string;
+  mcpCommand?: string;
+  mcpUrl?: string;
 }
 
 export interface Finding {
@@ -44,11 +46,15 @@ export interface Finding {
   malicious?: boolean;
   /** Informational: only direct pins are checked because no lockfile is present. */
   coverageNote?: boolean;
-  coverageKind?: "no-lockfile" | "not-exact";
+  coverageKind?: "no-lockfile" | "not-exact" | "unchecked-mcp";
   /** Original range/tag spec when the pin is not exact. */
   spec?: string;
   /** MCP server id from mcp.json when surface is mcp. */
   mcpId?: string;
+  /** Latest registry version used when the MCP pin was missing or not exact. */
+  resolvedVersion?: string;
+  mcpCommand?: string;
+  mcpUrl?: string;
 }
 
 export interface BaselineSnapshot {

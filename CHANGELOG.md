@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.27
+
+- Unpinned MCP servers: look up the latest npm/PyPI version and classify that version (malware → Malicious, CVE/GHSA → Vulnerable). Copy says unpinned; latest is X — not what npx will install tomorrow
+- MCP servers that are not packages (URL, docker, binary) show under Unchecked MCP servers instead of being hidden
+- Posture coverage: MCP servers not packages (N) focuses the MCP view
+
 ## 0.1.26
 
 - Honest pins: `^` `~` ranges, tags, and git/file specs are coverage gaps — not sent to OSV as a floor version

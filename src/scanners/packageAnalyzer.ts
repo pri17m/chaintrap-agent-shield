@@ -1,5 +1,6 @@
 import type { Ecosystem, Finding, FindingSource, OsvQuery } from "../types";
 import { classifyOsvIds, fetchOsvSummaries, pickPrimaryOsvId, queryOsvQuerybatch } from "../api/osvClient";
+import { fetchLatestPackageVersion } from "../api/registryVersion";
 import { matchKnownBad } from "./knownBad";
 
 export interface PackageToAnalyze {
@@ -12,6 +13,8 @@ export interface PackageToAnalyze {
   mcpId?: string;
   pinExact?: boolean;
   spec?: string;
+  /** Set when this query is latest-on-registry for an unpinned MCP server. */
+  resolvedLatest?: string;
 }
 
 function findingId(source: FindingSource, pkg: PackageToAnalyze): string {
@@ -19,7 +22,7 @@ function findingId(source: FindingSource, pkg: PackageToAnalyze): string {
   return `${source}:${pkg.surface}:${pkg.ecosystem}:${pkg.name}@${pkg.version}:${mcp}${pkg.path}`;
 }
 
-function pkgFields(pkg: PackageToAnalyze): Pick<Finding, "path" | "packageName" | "version" | "ecosystem" | "workspaceRoot" | "mcpId" | "spec"> {
+function pkgFields(pkg: PackageToAnalyze): Pick<Finding, "path" | "packageName" | "version" | "ecosystem" | "workspaceRoot" | "mcpId" | "spec" | "resolvedVersion"> {
   return {
     path: pkg.path,
     packageName: pkg.name,
@@ -28,6 +31,7 @@ function pkgFields(pkg: PackageToAnalyze): Pick<Finding, "path" | "packageName" 
     workspaceRoot: pkg.workspaceRoot,
     mcpId: pkg.mcpId,
     spec: pkg.spec,
+    resolvedVersion: pkg.resolvedLatest,
   };
 }
 
@@ -42,13 +46,50 @@ export function packageFindingCopy(opts: {
   version: string;
   summary?: string;
   fallback: string;
+  resolvedLatest?: string;
 }): { title: string; message: string; summary: string } {
   const summary = (opts.summary || opts.fallback).trim();
   const title = opts.malicious
     ? `This ${ecoLabel(opts.eco)} package is malicious`
     : `This ${ecoLabel(opts.eco)} package is vulnerable`;
-  const message = `Description: ${summary}\nPackage: ${opts.name}@${opts.version}`;
+  const kind = opts.malicious ? "malicious" : "vulnerable";
+  const latestNote = opts.resolvedLatest
+    ? `\nUnpinned; latest on ${ecoLabel(opts.eco)} is ${opts.resolvedLatest} and that version is ${kind}. That is not a guarantee of what npx/pip will install.`
+    : "";
+  const message = `Description: ${summary}\nPackage: ${opts.name}@${opts.version}${latestNote}`;
   return { title, message, summary };
+}
+
+function unpinnedMcpFinding(
+  pkg: PackageToAnalyze,
+  source: FindingSource,
+  now: string,
+  opts: { latest?: string; unverified: boolean; osvDown?: boolean },
+): Finding {
+  const latest = opts.latest;
+  const eco = ecoLabel(pkg.ecosystem);
+  let message = "Version is unknown; OSV exact-version lookup skipped. Pin the version for a complete check.";
+  if (!latest) {
+    message =
+      "Unpinned; latest on npm/PyPI could not be resolved. Not treated as safe. Pin the version for a complete check.";
+  } else if (opts.osvDown) {
+    message = `Unpinned; latest on ${eco} is ${latest} but OSV was unreachable. Not treated as safe.`;
+  } else {
+    message = `Unpinned; latest on ${eco} is ${latest}. No known malware or CVE on that version. That is not a guarantee of what npx/pip will install.`;
+  }
+  const unknownPkg = { ...pkg, version: "unknown", resolvedLatest: latest };
+  return {
+    id: findingId(source, unknownPkg) + ":unpinned",
+    source,
+    surface: "mcp",
+    severity: "info",
+    title: `Unpinned ${pkg.ecosystem} package ${pkg.name}`,
+    message,
+    ...pkgFields(unknownPkg),
+    acknowledged: false,
+    createdAt: now,
+    unverifiedOnline: opts.unverified,
+  };
 }
 
 export async function analyzePackages(
@@ -59,6 +100,7 @@ export async function analyzePackages(
   const findings: Finding[] = [];
   const now = new Date().toISOString();
   const needOsv: PackageToAnalyze[] = [];
+  const pendingLatest: PackageToAnalyze[] = [];
 
   for (const pkg of packages) {
     const kb = matchKnownBad(pkg.ecosystem, pkg.name, pkg.version);
@@ -70,6 +112,7 @@ export async function analyzePackages(
         version: pkg.version,
         summary: kb.campaign ? `${kb.campaign}: ${kb.note || kb.message}` : kb.message,
         fallback: kb.message,
+        resolvedLatest: pkg.resolvedLatest,
       });
       const id = findingId(source, pkg);
       findings.push({
@@ -88,6 +131,10 @@ export async function analyzePackages(
       });
     }
     if (!pkg.version || pkg.version === "unknown") {
+      if (!kb && pkg.surface === "mcp") {
+        pendingLatest.push(pkg);
+        continue;
+      }
       if (!kb) {
         const notExact = pkg.pinExact === false && pkg.surface === "package";
         findings.push({
@@ -112,6 +159,43 @@ export async function analyzePackages(
       continue;
     }
     needOsv.push(pkg);
+  }
+
+  for (const pkg of pendingLatest) {
+    const latest = await fetchLatestPackageVersion(pkg.ecosystem, pkg.name, fetchImpl);
+    if (!latest) {
+      findings.push(unpinnedMcpFinding(pkg, source, now, { unverified: true }));
+      continue;
+    }
+    const resolved: PackageToAnalyze = { ...pkg, version: latest, resolvedLatest: latest };
+    const kbLatest = matchKnownBad(resolved.ecosystem, resolved.name, latest);
+    if (kbLatest) {
+      const copy = packageFindingCopy({
+        malicious: true,
+        eco: resolved.ecosystem,
+        name: resolved.name,
+        version: latest,
+        summary: kbLatest.campaign ? `${kbLatest.campaign}: ${kbLatest.note || kbLatest.message}` : kbLatest.message,
+        fallback: kbLatest.message,
+        resolvedLatest: latest,
+      });
+      findings.push({
+        id: findingId(source, resolved),
+        source,
+        surface: "mcp",
+        severity: "critical",
+        title: copy.title,
+        message: copy.message,
+        summary: copy.summary,
+        ...pkgFields(resolved),
+        advisoryUrl: kbLatest.note.startsWith("http") ? kbLatest.note : undefined,
+        acknowledged: false,
+        createdAt: now,
+        malicious: true,
+      });
+      continue;
+    }
+    needOsv.push(resolved);
   }
 
   const queries: OsvQuery[] = needOsv.map((pkg) => ({
@@ -156,6 +240,7 @@ export async function analyzePackages(
           version: pkg.version,
           summary: osvSummary,
           fallback: existing.summary || existing.message,
+          resolvedLatest: pkg.resolvedLatest,
         });
         existing.title = copy.title;
         existing.message = copy.message;
@@ -166,6 +251,12 @@ export async function analyzePackages(
       return;
     }
     if (!osvOk && cls.ids.length === 0) {
+      if (pkg.resolvedLatest) {
+        findings.push(
+          unpinnedMcpFinding(pkg, source, now, { latest: pkg.resolvedLatest, unverified: true, osvDown: true }),
+        );
+        return;
+      }
       findings.push({
         id: id + ":offline",
         source,
@@ -181,6 +272,9 @@ export async function analyzePackages(
       return;
     }
     if (cls.severity === "info") {
+      if (pkg.resolvedLatest) {
+        findings.push(unpinnedMcpFinding(pkg, source, now, { latest: pkg.resolvedLatest, unverified: false }));
+      }
       return;
     }
     const copy = packageFindingCopy({
@@ -190,6 +284,7 @@ export async function analyzePackages(
       version: pkg.version,
       summary: osvSummary,
       fallback: `OSV findings: ${cls.ids.join(", ")}`,
+      resolvedLatest: pkg.resolvedLatest,
     });
     findings.push({
       id,

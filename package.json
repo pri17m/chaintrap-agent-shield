@@ -2,7 +2,7 @@
   "name": "chaintrap-agent-shield",
   "displayName": "Chaintrap Agent Shield — AI-Coding Security",
   "description": "AI-coding supply-chain security: scan dependencies + MCP server packages (npm/PyPI), flag malware/CVEs, and remove malicious pins in-editor.",
-  "version": "0.1.26",
+  "version": "0.1.27",
   "publisher": "pri17m",
   "license": "MIT",
   "icon": "media/icon.png",

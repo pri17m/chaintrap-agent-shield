@@ -25,6 +25,8 @@ export function packagesFromItems(items: InventoryItem[]): PackageToAnalyze[] {
         workspaceRoot: item.workspaceRoot,
         surface: "mcp",
         mcpId: item.mcpId,
+        pinExact: item.pinExact,
+        spec: item.spec,
       });
     }
   }
@@ -58,6 +60,47 @@ function coverageFindings(items: InventoryItem[], source: FindingSource): Findin
   return out;
 }
 
+export function looksLikePipeToShell(line: string): boolean {
+  const s = line.toLowerCase();
+  return /curl[\s\S]{0,200}\|[\s\S]{0,80}\b(sh|bash|zsh)\b/.test(s) || /wget[\s\S]{0,200}\|[\s\S]{0,80}\b(sh|bash|zsh)\b/.test(s);
+}
+
+function uncheckedMcpFindings(items: InventoryItem[], source: FindingSource): Finding[] {
+  const now = new Date().toISOString();
+  const out: Finding[] = [];
+  for (const item of items) {
+    if (item.kind !== "mcp" || item.packageName) {
+      continue;
+    }
+    const command = item.mcpCommand || "";
+    const url = item.mcpUrl || "";
+    const detail = url ? `URL: ${url}` : command ? `Command: ${command}` : "No command or URL recorded.";
+    const dropper = looksLikePipeToShell(`${command} ${url}`);
+    out.push({
+      id: `${source}:mcp:unchecked:${item.mcpId || "unknown"}:${item.path}`,
+      source,
+      surface: "mcp",
+      severity: dropper ? "medium" : "info",
+      title: dropper
+        ? `Unchecked MCP server ${item.mcpId || "unknown"} (pipe-to-shell)`
+        : `Unchecked MCP server ${item.mcpId || "unknown"}`,
+      message: dropper
+        ? `${detail}\nCommand string looks like curl|sh or wget|sh. Not a registry package — hygiene only, not malware-in-npm/PyPI.`
+        : `${detail}\nNot an npm/PyPI package — not checked against the registry.`,
+      path: item.path,
+      mcpId: item.mcpId,
+      mcpCommand: item.mcpCommand,
+      mcpUrl: item.mcpUrl,
+      acknowledged: false,
+      workspaceRoot: item.workspaceRoot,
+      createdAt: now,
+      coverageNote: true,
+      coverageKind: "unchecked-mcp",
+    });
+  }
+  return out;
+}
+
 export interface AnalyzeItemsOptions {
   /** Inventory keys whose hash is unchanged vs prior baseline — skip re-analysis. */
   skipKeys?: Set<string>;
@@ -65,7 +108,8 @@ export interface AnalyzeItemsOptions {
 
 /**
  * Skill/rule heuristics are disabled (false positives). Inventory still records
- * those files; only npm/PyPI packages and MCP-inferred packages produce findings.
+ * those files; npm/PyPI packages and MCP-inferred packages are analyzed.
+ * MCP rows without a package are listed as unchecked.
  */
 export async function analyzeItems(
   items: InventoryItem[],
@@ -76,5 +120,5 @@ export async function analyzeItems(
   const skip = options?.skipKeys;
   const toAnalyze = skip ? items.filter((i) => !skip.has(i.key)) : items;
   const pkgs = await analyzePackages(packagesFromItems(toAnalyze), source, fetchImpl);
-  return [...pkgs, ...coverageFindings(toAnalyze, source)];
+  return [...pkgs, ...coverageFindings(toAnalyze, source), ...uncheckedMcpFindings(toAnalyze, source)];
 }

@@ -239,3 +239,17 @@ export function inferredFromMcpServer(server: McpServerEntry): InferredPackage |
     args: server.args,
   });
 }
+
+export function formatMcpInvocation(server: McpServerEntry): string {
+  const parts: string[] = [];
+  if (server.command) {
+    parts.push(server.command);
+  }
+  for (const a of server.args) {
+    const s = String(a).trim();
+    if (s) {
+      parts.push(s);
+    }
+  }
+  return parts.join(" ");
+}

@@ -12,8 +12,15 @@ export function isPackageLike(f: Finding): boolean {
   return isManifestPackage(f) || isMcpServerFinding(f);
 }
 
+export function isUncheckedMcpFinding(f: Finding): boolean {
+  return f.surface === "mcp" && !f.packageName;
+}
+
 export function isUnpinnedMcpFinding(f: Finding): boolean {
   if (!isMcpServerFinding(f)) {
+    return false;
+  }
+  if (isMaliciousFinding(f) || isVulnerablePackageFinding(f)) {
     return false;
   }
   return !f.version || f.version === "unknown";
@@ -54,9 +61,11 @@ export function groupMcpFindings(findings: Finding[]): {
   malicious: Finding[];
   vulnerable: Finding[];
   unpinned: Finding[];
+  unchecked: Finding[];
 } {
   return {
     ...groupRisk(findings, isMcpServerFinding),
     unpinned: findings.filter(isUnpinnedMcpFinding),
+    unchecked: findings.filter(isUncheckedMcpFinding),
   };
 }

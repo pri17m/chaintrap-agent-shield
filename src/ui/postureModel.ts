@@ -130,7 +130,11 @@ export function coverageNoteFindings(findings: Finding[]): Finding[] {
 }
 
 export function lockfileCoverageFindings(findings: Finding[]): Finding[] {
-  return findings.filter((f) => f.coverageNote && f.coverageKind !== "not-exact");
+  return findings.filter((f) => f.coverageNote && f.coverageKind !== "not-exact" && f.coverageKind !== "unchecked-mcp");
+}
+
+export function uncheckedMcpCoverageFindings(findings: Finding[]): Finding[] {
+  return findings.filter((f) => f.coverageKind === "unchecked-mcp");
 }
 
 export function notExactCoverageFindings(findings: Finding[]): Finding[] {
@@ -162,6 +166,7 @@ export function buildPosture(findings: Finding[], summary: InventorySummary = EM
   const unackedCrit = findings.filter((f) => !f.acknowledged && f.severity === "critical").length;
   const lockfileNotes = lockfileCoverageFindings(findings);
   const notExactNotes = notExactCoverageFindings(findings);
+  const uncheckedMcp = mcp.unchecked;
   const unpinned = mcp.unpinned;
   const unverified = unverifiedOnlineFindings(findings);
   const gaps = actionableCoverageGapCount(findings);
@@ -286,8 +291,18 @@ export function buildPosture(findings: Finding[], summary: InventorySummary = EM
       group: "coverage",
       label: `Unpinned MCP servers (${unpinned.length})`,
       count: unpinned.length,
-      tooltip: "No version in the server config. Click to pin an exact version in mcp.json.",
+      tooltip: "No exact version in the server config. Latest published is checked when the registry is reachable.",
       command: { command: "chaintrap.pinMcpServerVersion", title: "Pin MCP version" },
+    });
+  }
+  if (uncheckedMcp.length > 0) {
+    coverageRows.push({
+      id: "uncheckedMcp",
+      group: "coverage",
+      label: `MCP servers not packages (${uncheckedMcp.length})`,
+      count: uncheckedMcp.length,
+      tooltip: "URL, docker, or binary MCP servers — listed only, not checked as npm/PyPI packages.",
+      command: { command: "chaintrap.mcp.focus", title: "Show MCP servers" },
     });
   }
   if (unverified.length > 0) {
