@@ -55,6 +55,16 @@ suite("mcpParser", () => {
     });
   });
 
+  test("infers pypi from uvx without pretending a version", () => {
+    const inf = inferNpmPypiFromMcpRow({ command: "uvx", args: ["httpx"] });
+    assert.deepStrictEqual(inf, { ecosystem: "pypi", name: "httpx", version: "unknown" });
+  });
+
+  test("infers pypi from uvx package==version", () => {
+    const inf = inferNpmPypiFromMcpRow({ command: "uvx", args: ["httpx==0.27.0"] });
+    assert.deepStrictEqual(inf, { ecosystem: "pypi", name: "httpx", version: "0.27.0" });
+  });
+
   test("parses mcp.json mcpServers map", () => {
     const servers = parseMcpConfigJson(
       JSON.stringify({

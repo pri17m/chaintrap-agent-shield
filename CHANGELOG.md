@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.26
+
+- Honest pins: `^` `~` ranges, tags, and git/file specs are coverage gaps — not sent to OSV as a floor version
+- `uvx` MCP servers infer PyPI (unpinned unless `name==version`)
+- Nested/monorepo manifests and lockfiles are inventoried (skip `node_modules` / build dirs; lockfile still wins per directory)
+
 ## 0.1.25
 
 - Coverage gaps are clickable: pin unpinned MCP servers to an exact version in `mcp.json` (no npm/npx spawn)

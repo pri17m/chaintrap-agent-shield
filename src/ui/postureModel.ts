@@ -125,6 +125,14 @@ export function coverageNoteFindings(findings: Finding[]): Finding[] {
   return findings.filter((f) => f.coverageNote);
 }
 
+export function lockfileCoverageFindings(findings: Finding[]): Finding[] {
+  return findings.filter((f) => f.coverageNote && f.coverageKind !== "not-exact");
+}
+
+export function notExactCoverageFindings(findings: Finding[]): Finding[] {
+  return findings.filter((f) => f.coverageKind === "not-exact");
+}
+
 export function unverifiedOnlineFindings(findings: Finding[]): Finding[] {
   return findings.filter((f) => f.unverifiedOnline && !isUnpinnedMcpFinding(f));
 }
@@ -148,7 +156,8 @@ export function buildPosture(findings: Finding[], summary: InventorySummary = EM
   const malicious = findings.filter(isMaliciousFinding).length;
   const vulnerable = findings.filter(isVulnerablePackageFinding).length;
   const unackedCrit = findings.filter((f) => !f.acknowledged && f.severity === "critical").length;
-  const lockfileNotes = coverageNoteFindings(findings);
+  const lockfileNotes = lockfileCoverageFindings(findings);
+  const notExactNotes = notExactCoverageFindings(findings);
   const unpinned = mcp.unpinned;
   const unverified = unverifiedOnlineFindings(findings);
   const gaps = actionableCoverageGapCount(findings);
@@ -252,6 +261,18 @@ export function buildPosture(findings: Finding[], summary: InventorySummary = EM
       tooltip: lockfileNotes.map((f) => f.message).join("\n") || "Add a lockfile to include transitive dependencies.",
       command: lockfileNotes[0]?.path
         ? { command: "chaintrap.openFindingLocation", title: "Open location", arguments: [lockfileNotes[0].path] }
+        : undefined,
+    });
+  }
+  if (notExactNotes.length > 0) {
+    coverageRows.push({
+      id: "notExact",
+      group: "coverage",
+      label: `Non-exact version specs (${notExactNotes.length})`,
+      count: notExactNotes.length,
+      tooltip: notExactNotes.map((f) => f.message).join("\n") || "Ranges and tags are not checked as exact pins.",
+      command: notExactNotes[0]?.path
+        ? { command: "chaintrap.openFindingLocation", title: "Open location", arguments: [notExactNotes[0].path] }
         : undefined,
     });
   }

@@ -10,6 +10,8 @@ export interface PackageToAnalyze {
   workspaceRoot?: string;
   surface: "mcp" | "package";
   mcpId?: string;
+  pinExact?: boolean;
+  spec?: string;
 }
 
 function findingId(source: FindingSource, pkg: PackageToAnalyze): string {
@@ -17,7 +19,7 @@ function findingId(source: FindingSource, pkg: PackageToAnalyze): string {
   return `${source}:${pkg.surface}:${pkg.ecosystem}:${pkg.name}@${pkg.version}:${mcp}${pkg.path}`;
 }
 
-function pkgFields(pkg: PackageToAnalyze): Pick<Finding, "path" | "packageName" | "version" | "ecosystem" | "workspaceRoot" | "mcpId"> {
+function pkgFields(pkg: PackageToAnalyze): Pick<Finding, "path" | "packageName" | "version" | "ecosystem" | "workspaceRoot" | "mcpId" | "spec"> {
   return {
     path: pkg.path,
     packageName: pkg.name,
@@ -25,6 +27,7 @@ function pkgFields(pkg: PackageToAnalyze): Pick<Finding, "path" | "packageName" 
     ecosystem: pkg.ecosystem,
     workspaceRoot: pkg.workspaceRoot,
     mcpId: pkg.mcpId,
+    spec: pkg.spec,
   };
 }
 
@@ -86,17 +89,24 @@ export async function analyzePackages(
     }
     if (!pkg.version || pkg.version === "unknown") {
       if (!kb) {
+        const notExact = pkg.pinExact === false && pkg.surface === "package";
         findings.push({
           id: findingId(source, pkg) + ":unpinned",
           source,
           surface: pkg.surface,
           severity: "info",
-          title: `Unpinned ${pkg.ecosystem} package ${pkg.name}`,
-          message: "Version is unknown; OSV exact-version lookup skipped. Pin the version for a complete check.",
+          title: notExact
+            ? `Non-exact ${pkg.ecosystem} spec ${pkg.name}`
+            : `Unpinned ${pkg.ecosystem} package ${pkg.name}`,
+          message: notExact
+            ? `Spec ${pkg.spec || "unknown"} is not an exact pin; OSV exact-version lookup skipped.`
+            : "Version is unknown; OSV exact-version lookup skipped. Pin the version for a complete check.",
           ...pkgFields(pkg),
           acknowledged: false,
           createdAt: now,
           unverifiedOnline: true,
+          coverageNote: notExact,
+          coverageKind: notExact ? "not-exact" : undefined,
         });
       }
       continue;

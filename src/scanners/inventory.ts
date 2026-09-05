@@ -12,8 +12,39 @@ import {
   parseYarnLockBody,
 } from "./lockfileParsers";
 import { inferredFromMcpServer, parseMcpConfigJson } from "./mcpParser";
+import { isExactNpmSpec, isExactPypiRequirement, pypiRequirementName } from "./pinSpec";
 
 export { parsePnpmPackageKey, parseYarnLockBody };
+
+const SKIP_WALK_DIRS = new Set([
+  "node_modules",
+  ".git",
+  "dist",
+  "build",
+  "out",
+  ".venv",
+  "venv",
+  "__pycache__",
+  ".next",
+  "coverage",
+  "vendor",
+  "target",
+]);
+
+const PACKAGE_INVENTORY_FILES = new Set([
+  "package.json",
+  "package-lock.json",
+  "pnpm-lock.yaml",
+  "yarn.lock",
+  "uv.lock",
+  "poetry.lock",
+  "Pipfile.lock",
+  "requirements.txt",
+]);
+
+function isPackageInventoryFile(name: string): boolean {
+  return PACKAGE_INVENTORY_FILES.has(name);
+}
 
 /** Skip loading skill/rule bodies larger than this (bytes). */
 export const MAX_SKILL_FILE_BYTES = 256 * 1024;
@@ -60,7 +91,7 @@ function walkFiles(
     }
     const full = path.join(dir, e.name);
     if (e.isDirectory()) {
-      if (e.name === "node_modules" || e.name === ".git") {
+      if (SKIP_WALK_DIRS.has(e.name)) {
         continue;
       }
       walkFiles(full, matcher, acc, depth + 1, maxFiles);
@@ -77,6 +108,7 @@ function addPackage(
   ecosystem: "npm" | "pypi",
   name: string,
   version: string,
+  extra?: { pinExact?: boolean; spec?: string },
 ): void {
   const n = name.trim().toLowerCase();
   const v = version.trim() || "unknown";
@@ -93,6 +125,8 @@ function addPackage(
     packageName: n,
     version: v,
     ecosystem,
+    pinExact: extra?.pinExact,
+    spec: extra?.spec,
   });
 }
 
@@ -112,8 +146,12 @@ function parsePackageJson(filePath: string, workspaceRoot: string, items: Invent
         continue;
       }
       for (const [name, spec] of Object.entries(block)) {
-        const ver = spec.replace(/^[\^~>=<]*/, "").split(" ")[0] || "unknown";
-        addPackage(items, workspaceRoot, filePath, "npm", name, ver);
+        const raw = String(spec ?? "").trim();
+        if (isExactNpmSpec(raw)) {
+          addPackage(items, workspaceRoot, filePath, "npm", name, raw, { pinExact: true });
+        } else {
+          addPackage(items, workspaceRoot, filePath, "npm", name, "unknown", { pinExact: false, spec: raw || "unknown" });
+        }
       }
     }
   } catch {
@@ -127,7 +165,7 @@ function addCoverageNote(
   filePath: string,
   ecosystem: Ecosystem,
 ): void {
-  const key = `coverage:${ecosystem}-lock:${workspaceRoot}`;
+  const key = `coverage:${ecosystem}-lock:${filePath}`;
   items.push({
     key,
     kind: "coverage",
@@ -135,6 +173,7 @@ function addCoverageNote(
     hash: sha256(key),
     workspaceRoot,
     ecosystem,
+    coverageKind: "no-lockfile",
   });
 }
 
@@ -208,9 +247,14 @@ function parseRequirements(filePath: string, workspaceRoot: string, items: Inven
     if (!t || t.startsWith("#") || t.startsWith("-")) {
       continue;
     }
-    const m = t.match(/^([A-Za-z0-9_.-]+)\s*==\s*([^\s;#]+)/);
-    if (m) {
-      addPackage(items, workspaceRoot, filePath, "pypi", m[1].toLowerCase().replace(/_/g, "-"), m[2]);
+    const exact = isExactPypiRequirement(t);
+    if (exact) {
+      addPackage(items, workspaceRoot, filePath, "pypi", exact.name, exact.version, { pinExact: true });
+      continue;
+    }
+    const name = pypiRequirementName(t);
+    if (name) {
+      addPackage(items, workspaceRoot, filePath, "pypi", name, "unknown", { pinExact: false, spec: t });
     }
   }
 }
@@ -313,12 +357,21 @@ export function userConfigPaths(): {
   };
 }
 
-export function inventoryWorkspaceRoot(workspaceRoot: string): InventoryItem[] {
-  const items: InventoryItem[] = [];
-  const pkgJson = path.join(workspaceRoot, "package.json");
-  const lock = path.join(workspaceRoot, "package-lock.json");
-  const pnpm = path.join(workspaceRoot, "pnpm-lock.yaml");
-  const yarn = path.join(workspaceRoot, "yarn.lock");
+function discoverPackageDirs(workspaceRoot: string): string[] {
+  const files: string[] = [];
+  walkFiles(workspaceRoot, isPackageInventoryFile, files);
+  const dirs = new Set<string>();
+  for (const f of files) {
+    dirs.add(path.dirname(f));
+  }
+  return [...dirs];
+}
+
+function inventoryPackageDir(dir: string, workspaceRoot: string, items: InventoryItem[]): void {
+  const pkgJson = path.join(dir, "package.json");
+  const lock = path.join(dir, "package-lock.json");
+  const pnpm = path.join(dir, "pnpm-lock.yaml");
+  const yarn = path.join(dir, "yarn.lock");
   const hasNpmLock = fs.existsSync(lock) || fs.existsSync(pnpm) || fs.existsSync(yarn);
   if (hasNpmLock) {
     if (fs.existsSync(lock)) {
@@ -334,10 +387,10 @@ export function inventoryWorkspaceRoot(workspaceRoot: string): InventoryItem[] {
     parsePackageJson(pkgJson, workspaceRoot, items);
     addCoverageNote(items, workspaceRoot, pkgJson, "npm");
   }
-  const uv = path.join(workspaceRoot, "uv.lock");
-  const poetry = path.join(workspaceRoot, "poetry.lock");
-  const pipfile = path.join(workspaceRoot, "Pipfile.lock");
-  const req = path.join(workspaceRoot, "requirements.txt");
+  const uv = path.join(dir, "uv.lock");
+  const poetry = path.join(dir, "poetry.lock");
+  const pipfile = path.join(dir, "Pipfile.lock");
+  const req = path.join(dir, "requirements.txt");
   const hasPyLock = fs.existsSync(uv) || fs.existsSync(poetry) || fs.existsSync(pipfile);
   if (hasPyLock) {
     if (fs.existsSync(uv)) {
@@ -352,6 +405,13 @@ export function inventoryWorkspaceRoot(workspaceRoot: string): InventoryItem[] {
   } else if (fs.existsSync(req)) {
     parseRequirements(req, workspaceRoot, items);
     addCoverageNote(items, workspaceRoot, req, "pypi");
+  }
+}
+
+export function inventoryWorkspaceRoot(workspaceRoot: string): InventoryItem[] {
+  const items: InventoryItem[] = [];
+  for (const dir of discoverPackageDirs(workspaceRoot)) {
+    inventoryPackageDir(dir, workspaceRoot, items);
   }
   const mcpWs = path.join(workspaceRoot, ".cursor", "mcp.json");
   if (fs.existsSync(mcpWs)) {

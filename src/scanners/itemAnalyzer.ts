@@ -12,6 +12,8 @@ export function packagesFromItems(items: InventoryItem[]): PackageToAnalyze[] {
         path: item.path,
         workspaceRoot: item.workspaceRoot,
         surface: "package",
+        pinExact: item.pinExact,
+        spec: item.spec,
       });
     }
     if (item.kind === "mcp" && item.packageName && item.ecosystem) {
@@ -50,6 +52,7 @@ function coverageFindings(items: InventoryItem[], source: FindingSource): Findin
       workspaceRoot: item.workspaceRoot,
       createdAt: now,
       coverageNote: true,
+      coverageKind: item.coverageKind || "no-lockfile",
     });
   }
   return out;

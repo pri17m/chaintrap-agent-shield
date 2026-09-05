@@ -53,7 +53,27 @@ function invokerLine(command: string, argsList: unknown[]): string {
 }
 
 function lineImpliesNpmTool(line: string): boolean {
-  return ["npx", "npm", "pnpm", "yarn", "bunx", "uvx"].some((x) => line.includes(x));
+  return ["npx", "npm", "pnpm", "yarn", "bunx"].some((x) => line.includes(x));
+}
+
+function lineImpliesUvx(line: string): boolean {
+  return line.includes("uvx");
+}
+
+function splitPypiSpecFromArgs(args: unknown[]): [string, string] | null {
+  const tokens = args.map((a) => (typeof a === "string" ? a.trim() : String(a))).filter((t) => t && !t.startsWith("-"));
+  for (let i = tokens.length - 1; i >= 0; i--) {
+    const cand = tokens[i];
+    if (cand.toLowerCase().includes("uvx")) {
+      continue;
+    }
+    const eq = cand.match(/^([A-Za-z0-9_.-]+)==(.+)$/);
+    if (eq) {
+      return [eq[1].toLowerCase().replace(/_/g, "-"), eq[2].trim() || "unknown"];
+    }
+    return [cand.toLowerCase().replace(/_/g, "-"), "unknown"];
+  }
+  return null;
 }
 
 function lineImpliesPython(line: string): boolean {
@@ -152,6 +172,13 @@ export function inferNpmPypiFromMcpRow(row: Record<string, unknown>): InferredPa
     const pypiGuess = normCmp(mod.replace(/\./g, "-"));
     if (pypiGuess) {
       return { ecosystem: "pypi", name: pypiGuess, version: "unknown" };
+    }
+  }
+
+  if (lineImpliesUvx(line)) {
+    const py = splitPypiSpecFromArgs(argsList);
+    if (py && py[0]) {
+      return { ecosystem: "pypi", name: py[0], version: (py[1] || "").trim() ? py[1] : "unknown" };
     }
   }
 
