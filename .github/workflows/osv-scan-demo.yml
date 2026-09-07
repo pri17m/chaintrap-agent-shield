@@ -1,0 +1,42 @@
+name: OSV Scan (demo)
+
+on:
+  pull_request:
+    paths:
+      - "vuln-demo/mcp-kotlin-cve-2026-63658/**"
+      - ".github/workflows/osv-scan-demo.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  osv_scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Run OSV-Scanner
+        uses: google/osv-scanner-action/osv-scanner-action@6e4298ebc4db23e847df9b2e2de2939d6f066c67 # v2.5.1
+        continue-on-error: true
+        with:
+          scan-args: |-
+            --format=sarif
+            --output=osv-results.sarif
+            --recursive
+            ./vuln-demo/mcp-kotlin-cve-2026-63658
+
+      - name: Upload SARIF to Code Scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@5ba2889ada762081db2c4f32a729827dce632c7b # v3
+        with:
+          sarif_file: osv-results.sarif
+
+      - name: Fail the job if CVE is present (expected)
+        if: always()
+        run: |
+          if grep -qE 'CVE-2026-63658|GHSA-f47c-p7wj-q7gx' osv-results.sarif; then
+            echo "Detected CVE-2026-63658 / GHSA-f47c-p7wj-q7gx (expected for demo)."
+            exit 1
+          fi
