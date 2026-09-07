@@ -15,7 +15,7 @@
 </div>
 
 <p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
-AI-coding supply-chain security for Cursor / VS Code. Chaintrap inventories npm and PyPI pins in the open workspace and in MCP configs, classifies each as malicious packages or vulnerable packages (CVE/GHSA), and surfaces a posture rollup so you can review what the agent pulled in.
+AI-coding supply-chain security for Cursor / VS Code. Chaintrap inventories registry pins (npm, PyPI, Maven, Go, crates, and other OSV ecosystems) in the open workspace and in MCP configs, classifies each as malicious packages or vulnerable packages (CVE/GHSA), and surfaces a posture rollup so you can review what the agent pulled in.
 </p>
 
 <h2 style="font-family: Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif; font-weight: 700;">Fix issues</h2>
@@ -33,7 +33,7 @@ The confirm dialog groups every action and says why:
 <ul style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
 <li><b>Delete</b> known-bad or OSV malware pins (and that MCP server) from the manifest.</li>
 <li><b>Pin / upgrade</b> unpinned or range specs, and vulnerable exact pins, to the highest OSV-clean version that fits (same major first; later major only if every same-major release is still dirty).</li>
-<li><b>Skip</b> what cannot be edited safely: URL/docker MCP, git/file specs, lockfile-only coverage, or no clean published version.</li>
+<li><b>Skip</b> what cannot be edited safely: URL/docker MCP, git/file specs, lockfile-only coverage, non-npm/PyPI ecosystems, or no clean published version.</li>
 </ul>
 
 <p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
@@ -55,8 +55,8 @@ Edits <code>package.json</code>, <code>requirements.txt</code>, and <code>mcp.js
 <h2 style="font-family: Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif; font-weight: 700;">Coverage</h2>
 
 <ul style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
-<li><b>Dependencies:</b> workspace manifests and lockfiles. With a lockfile, locked transitives are included.</li>
-<li><b>MCP servers (MCP security):</b> the package inferred from each server entry in workspace <code>.vscode/mcp.json</code> or <code>.cursor/mcp.json</code> (for example <code>npx</code> or <code>pip</code>), plus user-level MCP configs. Listed separately from project dependencies so you can see which server pulled the pin.</li>
+<li><b>Dependencies:</b> workspace manifests and lockfiles across OSV ecosystems (npm including <code>bun.lock</code>, PyPI including <code>pyproject.toml</code>, Maven <code>pom.xml</code> / Gradle lockfiles, Go, Cargo, RubyGems, NuGet, Packagist, GitHub Actions, Pub, Hex, Swift, Hackage, CRAN, Conan). With a lockfile, locked transitives are included. Manifest-only trees get a coverage gap (direct pins only). Unparseable project files (e.g. Gradle DSL without <code>gradle.lockfile</code>) are listed as present-not-scanned, not skipped silently.</li>
+<li><b>MCP servers (MCP security):</b> the package inferred from each server entry in workspace <code>.vscode/mcp.json</code> or <code>.cursor/mcp.json</code> (for example <code>npx</code>, <code>uvx</code>, <code>pipx</code>, <code>go run</code>, <code>cargo install</code>), plus user-level MCP configs. URL, docker, and <code>java -jar</code> servers stay unchecked with a reason.</li>
 <li><b>Unpinned MCP servers:</b> config has a package name and no version, so the pin cannot be checked.</li>
 </ul>
 

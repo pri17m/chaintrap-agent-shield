@@ -1,4 +1,5 @@
 import type { Finding, FindingSource, InventoryItem } from "../types";
+import { lockfileHint } from "./ecosystems";
 import { analyzePackages, type PackageToAnalyze } from "./packageAnalyzer";
 
 export function packagesFromItems(items: InventoryItem[]): PackageToAnalyze[] {
@@ -40,14 +41,17 @@ function coverageFindings(items: InventoryItem[], source: FindingSource): Findin
     if (item.kind !== "coverage" || !item.ecosystem) {
       continue;
     }
-    const lockHint = item.ecosystem === "pypi" ? "uv.lock, poetry.lock, or Pipfile.lock" : "package-lock.json, pnpm-lock.yaml, or yarn.lock";
+    const unscanned = item.coverageKind === "unscanned";
+    const lockHint = lockfileHint(item.ecosystem);
     out.push({
       id: `${source}:coverage:${item.ecosystem}:${item.path}`,
       source,
       surface: "package",
       severity: "info",
-      title: "Only direct pins are checked",
-      message: `Add a lockfile (${lockHint}) to include transitive dependencies.`,
+      title: unscanned ? "Project present, not scanned" : "Only direct pins are checked",
+      message: unscanned
+        ? `This ${item.ecosystem} project file is recognized but not parsed. Add ${lockHint} to include dependencies.`
+        : `Add a lockfile (${lockHint}) to include transitive dependencies.`,
       path: item.path,
       ecosystem: item.ecosystem,
       acknowledged: false,
@@ -63,6 +67,23 @@ function coverageFindings(items: InventoryItem[], source: FindingSource): Findin
 export function looksLikePipeToShell(line: string): boolean {
   const s = line.toLowerCase();
   return /curl[\s\S]{0,200}\|[\s\S]{0,80}\b(sh|bash|zsh)\b/.test(s) || /wget[\s\S]{0,200}\|[\s\S]{0,80}\b(sh|bash|zsh)\b/.test(s);
+}
+
+function uncheckedMcpReason(command: string, url: string): string {
+  if (url) {
+    return "URL";
+  }
+  const c = command.toLowerCase();
+  if (c.includes("docker")) {
+    return "docker";
+  }
+  if (/\.jar\b/.test(c) || c.includes("java -jar") || c.includes("java -jar")) {
+    return "jar";
+  }
+  if (looksLikePipeToShell(c)) {
+    return "pipe-to-shell";
+  }
+  return "binary";
 }
 
 function uncheckedMcpFindings(items: InventoryItem[], source: FindingSource): Finding[] {
@@ -85,8 +106,8 @@ function uncheckedMcpFindings(items: InventoryItem[], source: FindingSource): Fi
         ? `Unchecked MCP server ${item.mcpId || "unknown"} (pipe-to-shell)`
         : `Unchecked MCP server ${item.mcpId || "unknown"}`,
       message: dropper
-        ? `${detail}\nCommand string looks like curl|sh or wget|sh. Not a registry package — hygiene only, not malware-in-npm/PyPI.`
-        : `${detail}\nNot an npm/PyPI package — not checked against the registry.`,
+        ? `${detail}\nCommand string looks like curl|sh or wget|sh. Not a registry package — hygiene only, not malware-in-registry.`
+        : `${detail}\nNot a registry package (${uncheckedMcpReason(command, url)}) — not checked against OSV.`,
       path: item.path,
       mcpId: item.mcpId,
       mcpCommand: item.mcpCommand,
@@ -108,7 +129,7 @@ export interface AnalyzeItemsOptions {
 
 /**
  * Skill/rule heuristics are disabled (false positives). Inventory still records
- * those files; npm/PyPI packages and MCP-inferred packages are analyzed.
+ * those files; registry packages and MCP-inferred packages are analyzed.
  * MCP rows without a package are listed as unchecked.
  */
 export async function analyzeItems(

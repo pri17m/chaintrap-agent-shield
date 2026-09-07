@@ -53,7 +53,7 @@ export function matchKnownBad(
     return null;
   }
   const doc = loadKnownBad(dataPath);
-  const ecoMap = eco === "pypi" ? doc.pypi : doc.npm;
+  const ecoMap = eco === "pypi" ? doc.pypi : eco === "npm" ? doc.npm : undefined;
   const versions = ecoMap?.[pkgName];
   if (!Array.isArray(versions) || !versions.includes(ver)) {
     return null;

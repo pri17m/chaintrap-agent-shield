@@ -1,7 +1,23 @@
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 export type FindingSource = "baseline" | "delta";
 export type Surface = "mcp" | "package" | "skill" | "rule" | "extension";
-export type Ecosystem = "npm" | "pypi";
+export type Ecosystem =
+  | "npm"
+  | "pypi"
+  | "maven"
+  | "go"
+  | "crates"
+  | "rubygems"
+  | "nuget"
+  | "packagist"
+  | "github_actions"
+  | "pub"
+  | "hex"
+  | "swift"
+  | "hackage"
+  | "cran"
+  | "conan";
+export type CoverageKind = "no-lockfile" | "not-exact" | "unchecked-mcp" | "unscanned";
 
 export interface InventoryItem {
   key: string;
@@ -17,7 +33,7 @@ export interface InventoryItem {
   pinExact?: boolean;
   /** Original manifest spec when pinExact is false (e.g. ^4.17.21). */
   spec?: string;
-  coverageKind?: "no-lockfile" | "not-exact" | "unchecked-mcp";
+  coverageKind?: CoverageKind;
   /** Ephemeral UTF-8 body for the current scan pass — never persist. */
   content?: string;
   mcpCommand?: string;
@@ -46,7 +62,7 @@ export interface Finding {
   malicious?: boolean;
   /** Informational: only direct pins are checked because no lockfile is present. */
   coverageNote?: boolean;
-  coverageKind?: "no-lockfile" | "not-exact" | "unchecked-mcp";
+  coverageKind?: CoverageKind;
   /** Original range/tag spec when the pin is not exact. */
   spec?: string;
   /** MCP server id from mcp.json when surface is mcp. */

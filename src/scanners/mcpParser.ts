@@ -1,4 +1,4 @@
-export type Ecosystem = "npm" | "pypi";
+import type { Ecosystem } from "../types";
 
 export interface McpServerEntry {
   id: string;
@@ -91,7 +91,7 @@ function parseNpmPackageSpec(cand: string): [string, string] | null {
 function splitPypiSpecFromArgs(args: unknown[]): [string, string] | null {
   const tokens = args.map((a) => (typeof a === "string" ? a.trim() : String(a))).filter((t) => t && !t.startsWith("-"));
   for (const cand of tokens) {
-    if (cand.toLowerCase().includes("uvx")) {
+    if (["uvx", "pipx", "run", "exec"].includes(cand.toLowerCase())) {
       continue;
     }
     const eq = cand.match(/^([A-Za-z0-9_.-]+)==(.+)$/);
@@ -99,6 +99,80 @@ function splitPypiSpecFromArgs(args: unknown[]): [string, string] | null {
       return [eq[1].toLowerCase().replace(/_/g, "-"), eq[2].trim() || "unknown"];
     }
     return [cand.toLowerCase().replace(/_/g, "-"), "unknown"];
+  }
+  return null;
+}
+
+function lineImpliesPipx(line: string): boolean {
+  return line.includes("pipx");
+}
+
+function lineImpliesGo(line: string): boolean {
+  return /\bgo(\.exe)?\b/.test(line) && /\b(run|install)\b/.test(line);
+}
+
+function lineImpliesCargo(line: string): boolean {
+  return line.includes("cargo");
+}
+
+function tokenBase(t: string): string {
+  return t.replace(/\\/g, "/").split("/").pop() || t;
+}
+
+function inferGoSpec(args: unknown[]): [string, string] | null {
+  for (const a of args) {
+    const cand = String(a).trim();
+    if (!cand || cand.startsWith("-")) {
+      continue;
+    }
+    if (!cand.includes(".") && !cand.includes("/")) {
+      continue;
+    }
+    const at = cand.lastIndexOf("@");
+    if (at > 0) {
+      return [cand.slice(0, at), cand.slice(at + 1) || "unknown"];
+    }
+    if (cand.startsWith("github.com/") || cand.startsWith("golang.org/") || cand.startsWith("gopkg.in/")) {
+      return [cand, "unknown"];
+    }
+  }
+  return null;
+}
+
+function inferCargoSpec(args: unknown[]): [string, string] | null {
+  const tokens = args.map((a) => String(a).trim());
+  let version = "unknown";
+  for (let i = 0; i < tokens.length; i++) {
+    if ((tokens[i] === "--version" || tokens[i] === "-V") && tokens[i + 1]) {
+      version = tokens[i + 1];
+    }
+  }
+  for (const t of tokens) {
+    if (t.startsWith("-") || t === "install" || t === "run" || t === "cargo") {
+      continue;
+    }
+    const at = t.lastIndexOf("@");
+    if (at > 0) {
+      return [t.slice(0, at), t.slice(at + 1) || version];
+    }
+    if (/^[A-Za-z0-9_-]+$/.test(t)) {
+      return [t, version];
+    }
+  }
+  return null;
+}
+
+function inferNugetSpec(args: unknown[]): [string, string] | null {
+  const tokens = args.map((a) => String(a).trim()).filter((t) => t && !t.startsWith("-"));
+  for (const t of tokens) {
+    if (/^(dotnet|dnx|tool|run|exec)$/i.test(tokenBase(t))) {
+      continue;
+    }
+    const at = t.lastIndexOf("@");
+    if (at > 0) {
+      return [t.slice(0, at), t.slice(at + 1) || "unknown"];
+    }
+    return [t, "unknown"];
   }
   return null;
 }
@@ -187,10 +261,31 @@ export function inferNpmPypiFromMcpRow(row: Record<string, unknown>): InferredPa
     }
   }
 
-  if (lineImpliesUvx(line)) {
+  if (lineImpliesUvx(line) || lineImpliesPipx(line)) {
     const py = splitPypiSpecFromArgs(argsList);
     if (py && py[0]) {
       return { ecosystem: "pypi", name: py[0], version: (py[1] || "").trim() ? py[1] : "unknown" };
+    }
+  }
+
+  if (lineImpliesGo(line)) {
+    const go = inferGoSpec(argsList);
+    if (go && go[0]) {
+      return { ecosystem: "go", name: go[0], version: go[1] || "unknown" };
+    }
+  }
+
+  if (lineImpliesCargo(line) && /\b(install|run)\b/.test(line)) {
+    const crate = inferCargoSpec(argsList);
+    if (crate && crate[0]) {
+      return { ecosystem: "crates", name: crate[0], version: crate[1] || "unknown" };
+    }
+  }
+
+  if (/\b(dotnet|dnx)(\.exe)?\b/.test(line)) {
+    const nuget = inferNugetSpec(argsList);
+    if (nuget && nuget[0]) {
+      return { ecosystem: "nuget", name: nuget[0], version: nuget[1] || "unknown" };
     }
   }
 
