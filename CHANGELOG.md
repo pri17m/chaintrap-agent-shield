@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.34
+
+- Detect-only inventory for OSV ecosystems beyond npm/PyPI: Maven (`pom.xml`, Gradle lockfiles), Go, crates.io, RubyGems, NuGet, Packagist, GitHub Actions, Pub, Hex, Swift, Hackage, CRAN, Conan
+- Close holes: `bun.lock`, `pyproject.toml`, `pdm.lock`, `pylock.toml`
+- MCP inference for `go run` / `go install`, `cargo install`, and `pipx` (URL/docker/`java -jar` still unchecked, with a reason)
+- Honest coverage gaps: manifest without lockfile (direct pins only); Gradle DSL / Gemfile / mix.exs / Package.swift / conanfile without a lockfile (present, not scanned). No Maven graph resolution
+- Workspace posture Checked lists exact pins per ecosystem. Fix issues still edits npm/PyPI/`mcp.json` only
+
 ## 0.1.33
 
 - Marketplace listing: **Fix issues** section with the tools-button and confirm-dialog screenshots

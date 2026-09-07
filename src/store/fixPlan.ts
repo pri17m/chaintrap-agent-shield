@@ -1,3 +1,4 @@
+import { isWritableEcosystem } from "../scanners/ecosystems";
 import type { Finding } from "../types";
 import { implicitSameMajorRange, isUnpinnableSpec, parseSemver } from "../scanners/pinSpec";
 import {
@@ -46,13 +47,16 @@ export function shouldSkipFinding(f: Finding): string | undefined {
     return "skills/rules are not edited";
   }
   if (isUncheckedMcpFinding(f) || f.coverageKind === "unchecked-mcp") {
-    return "not an npm/PyPI package";
+    return "not a registry package";
   }
-  if (f.coverageKind === "no-lockfile" || (f.coverageNote && !f.packageName && f.coverageKind !== "not-exact")) {
+  if (f.coverageKind === "no-lockfile" || f.coverageKind === "unscanned" || (f.coverageNote && !f.packageName && f.coverageKind !== "not-exact")) {
     return "lockfile coverage only";
   }
   if (!f.packageName) {
     return "no package name";
+  }
+  if (!isWritableEcosystem(f.ecosystem)) {
+    return "Fix issues only edits npm/PyPI manifests";
   }
   if (isUnpinnableSpec(f.spec || "")) {
     return "git/file/URL spec cannot be pinned";

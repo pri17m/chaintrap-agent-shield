@@ -14,7 +14,7 @@ Only these surfaces are inventoried (workspace roots you have open, plus user ag
 
 
 
-- Dependency manifests and lockfiles (`package.json`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `requirements.txt`). `uv.lock` is watched for change notifications but not fully parsed yet.
+- Dependency manifests and lockfiles for OSV-queryable ecosystems, including `package.json` / npm lockfiles / `bun.lock`, `requirements.txt` / `pyproject.toml` / `uv.lock` / `poetry.lock` / `Pipfile.lock` / `pdm.lock`, `pom.xml` / Gradle lockfiles, `go.mod` / `go.sum`, `Cargo.lock`, `Gemfile.lock`, NuGet lockfiles, `composer.lock`, `.github/workflows/*.yml`, `pubspec.lock`, `mix.lock`, `Package.resolved`, Haskell freeze files, `renv.lock`, and `conan.lock`. Recognized project files that cannot be parsed (for example `build.gradle.kts` without a lockfile) are recorded as coverage gaps.
 
 - MCP configs (workspace `.cursor/mcp.json`, workspace `.vscode/mcp.json`, `~/.cursor/mcp.json`, VS Code / Cursor User `mcp.json`)
 
@@ -30,7 +30,7 @@ The extension does not execute workspace code. It does not upload source files.
 
 
 
-**Default (required for online package checks):** package **name**, **version**, and ecosystem (`npm` or `PyPI`) to `https://api.osv.dev/v1/querybatch`, and when an advisory is shown, `https://api.osv.dev/v1/vulns/{id}` for the OSV **summary**. Skill and rule **contents never leave the machine** and are not analyzed for findings in 0.1.6.
+**Default (required for online package checks):** package **name**, **version**, and ecosystem (OSV names such as `npm`, `PyPI`, `Maven`, `Go`, `crates.io`) to `https://api.osv.dev/v1/querybatch`, and when an advisory is shown, `https://api.osv.dev/v1/vulns/{id}` for the OSV **summary**. Skill and rule **contents never leave the machine** and are not analyzed for findings.
 
 
 

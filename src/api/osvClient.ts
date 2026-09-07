@@ -1,10 +1,11 @@
 export const OSV_QUERYBATCH_URL = "https://api.osv.dev/v1/querybatch";
 export const OSV_VULN_URL = "https://api.osv.dev/v1/vulns";
 
+import { osvEcosystemName } from "../scanners/ecosystems";
 import type { Ecosystem, OsvQuery, OsvVuln } from "../types";
 
 function osvEcosystem(eco: Ecosystem): string {
-  return eco === "pypi" ? "PyPI" : "npm";
+  return osvEcosystemName(eco);
 }
 
 export function pickPrimaryOsvId(ids: string[]): string | undefined {

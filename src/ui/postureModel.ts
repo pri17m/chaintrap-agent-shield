@@ -1,4 +1,5 @@
-import type { Finding, InventoryItem } from "../types";
+import type { Ecosystem, Finding, InventoryItem } from "../types";
+import { ecosystemLabel } from "../scanners/ecosystems";
 import {
   groupDependencyFindings,
   groupMcpFindings,
@@ -17,6 +18,7 @@ export type PostureGroupKind = "attention" | "coverage" | "checked";
 export interface InventorySummary {
   npmPins: number;
   pypiPins: number;
+  pinsByEcosystem: Partial<Record<Ecosystem, number>>;
   mcpServers: number;
   skills: number;
   rules: number;
@@ -30,6 +32,7 @@ export interface InventorySummary {
 export const EMPTY_INVENTORY_SUMMARY: InventorySummary = {
   npmPins: 0,
   pypiPins: 0,
+  pinsByEcosystem: {},
   mcpServers: 0,
   skills: 0,
   rules: 0,
@@ -70,27 +73,25 @@ export interface PostureModel {
 }
 
 export function packagesChecked(summary: InventorySummary): number {
-  return summary.npmPins + summary.pypiPins + summary.mcpServers;
+  const pins = Object.values(summary.pinsByEcosystem || {}).reduce((a, b) => a + (b || 0), 0);
+  const legacy = summary.npmPins + summary.pypiPins;
+  const packagePins = pins || legacy;
+  return packagePins + summary.mcpServers;
 }
 
 export function summarizeInventory(items: InventoryItem[], hasOpenFolder: boolean): InventorySummary {
   const sources = new Set<WorkspaceMcpSource>();
-  let npmPins = 0;
-  let pypiPins = 0;
+  const pinsByEcosystem: Partial<Record<Ecosystem, number>> = {};
   let mcpServers = 0;
   let skills = 0;
   let rules = 0;
   for (const item of items) {
     if (item.kind === "package") {
       const exact = item.pinExact !== false && Boolean(item.version) && item.version !== "unknown";
-      if (!exact) {
+      if (!exact || !item.ecosystem) {
         continue;
       }
-      if (item.ecosystem === "pypi") {
-        pypiPins += 1;
-      } else if (item.ecosystem === "npm") {
-        npmPins += 1;
-      }
+      pinsByEcosystem[item.ecosystem] = (pinsByEcosystem[item.ecosystem] || 0) + 1;
     } else if (item.kind === "mcp") {
       mcpServers += 1;
       if (item.workspaceRoot) {
@@ -116,8 +117,9 @@ export function summarizeInventory(items: InventoryItem[], hasOpenFolder: boolea
     workspaceMcpSources.push("cursor");
   }
   return {
-    npmPins,
-    pypiPins,
+    npmPins: pinsByEcosystem.npm || 0,
+    pypiPins: pinsByEcosystem.pypi || 0,
+    pinsByEcosystem,
     mcpServers,
     skills,
     rules,
@@ -132,7 +134,17 @@ export function coverageNoteFindings(findings: Finding[]): Finding[] {
 }
 
 export function lockfileCoverageFindings(findings: Finding[]): Finding[] {
-  return findings.filter((f) => f.coverageNote && f.coverageKind !== "not-exact" && f.coverageKind !== "unchecked-mcp");
+  return findings.filter(
+    (f) =>
+      f.coverageNote &&
+      f.coverageKind !== "not-exact" &&
+      f.coverageKind !== "unchecked-mcp" &&
+      f.coverageKind !== "unscanned",
+  );
+}
+
+export function unscannedCoverageFindings(findings: Finding[]): Finding[] {
+  return findings.filter((f) => f.coverageKind === "unscanned");
 }
 
 export function uncheckedMcpCoverageFindings(findings: Finding[]): Finding[] {
@@ -199,6 +211,7 @@ export function buildPosture(findings: Finding[], summary: InventorySummary = EM
   const vulnerable = findings.filter(isVulnerablePackageFinding).length;
   const unackedCrit = findings.filter((f) => !f.acknowledged && f.severity === "critical").length;
   const lockfileNotes = lockfileCoverageFindings(findings);
+  const unscannedNotes = unscannedCoverageFindings(findings);
   const notExactNotes = notExactCoverageFindings(findings);
   const uncheckedMcp = mcp.unchecked;
   const unpinned = mcp.unpinned;
@@ -215,7 +228,7 @@ export function buildPosture(findings: Finding[], summary: InventorySummary = EM
     `${checked} checked`,
   ].join(" · ");
 
-  const inventoryEmpty = checked === 0 && skillRuleCount === 0 && lockfileNotes.length === 0;
+  const inventoryEmpty = checked === 0 && skillRuleCount === 0 && lockfileNotes.length === 0 && unscannedNotes.length === 0;
   if (summary.scanning && findings.length === 0 && inventoryEmpty) {
     return {
       scanning: true,
@@ -307,6 +320,18 @@ export function buildPosture(findings: Finding[], summary: InventorySummary = EM
         : undefined,
     });
   }
+  if (unscannedNotes.length > 0) {
+    coverageRows.push({
+      id: "unscanned",
+      group: "coverage",
+      label: `Project present, not scanned (${unscannedNotes.length})`,
+      count: unscannedNotes.length,
+      tooltip: unscannedNotes.map((f) => f.message).join("\n") || "Recognized project without a parseable lockfile.",
+      command: unscannedNotes[0]?.path
+        ? { command: "chaintrap.openFindingLocation", title: "Open location", arguments: [unscannedNotes[0].path] }
+        : undefined,
+    });
+  }
   if (notExactNotes.length > 0) {
     coverageRows.push({
       id: "notExact",
@@ -360,19 +385,28 @@ export function buildPosture(findings: Finding[], summary: InventorySummary = EM
     });
   }
 
-  const checkedRows: PostureRow[] = [
-    {
-      id: "checkedNpm",
+  const checkedRows: PostureRow[] = [];
+  const ecoCounts: Array<[Ecosystem, number]> = [
+    ["npm", summary.npmPins],
+    ["pypi", summary.pypiPins],
+  ];
+  const seen = new Set<Ecosystem>(["npm", "pypi"]);
+  for (const [eco, count] of Object.entries(summary.pinsByEcosystem || {}) as Array<[Ecosystem, number]>) {
+    if (seen.has(eco)) {
+      continue;
+    }
+    ecoCounts.push([eco, count || 0]);
+  }
+  for (const [eco, count] of ecoCounts) {
+    const id = eco === "npm" ? "checkedNpm" : eco === "pypi" ? "checkedPypi" : `checked:${eco}`;
+    checkedRows.push({
+      id,
       group: "checked",
-      label: `npm pins (${summary.npmPins})`,
-      count: summary.npmPins,
-    },
-    {
-      id: "checkedPypi",
-      group: "checked",
-      label: `PyPI pins (${summary.pypiPins})`,
-      count: summary.pypiPins,
-    },
+      label: `${ecosystemLabel(eco)} pins (${count})`,
+      count,
+    });
+  }
+  checkedRows.push(
     {
       id: "checkedMcp",
       group: "checked",
@@ -391,7 +425,7 @@ export function buildPosture(findings: Finding[], summary: InventorySummary = EM
       label: `Rules inventoried (${summary.rules})`,
       count: summary.rules,
     },
-  ];
+  );
   if (summary.workspaceMcpSources.length > 0) {
     checkedRows.push({
       id: "mcpSources",

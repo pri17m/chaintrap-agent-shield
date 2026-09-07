@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { fetchLatestPackageVersion } from "../api/registryVersion";
+import { isWritableEcosystem } from "../scanners/ecosystems";
 import { isPinVersion, pinMcpServerById, suggestedPinVersion } from "../store/pinMcp";
 import type { Finding } from "../types";
 import { isUnpinnedMcpFinding } from "./findingGroups";
@@ -13,7 +14,7 @@ export async function resolveLatestPinVersion(
   if (cached) {
     return cached;
   }
-  if (!finding.packageName) {
+  if (!finding.packageName || !isWritableEcosystem(finding.ecosystem)) {
     return undefined;
   }
   return fetchLatestPackageVersion(finding.ecosystem === "pypi" ? "pypi" : "npm", finding.packageName, fetchImpl ?? fetch);

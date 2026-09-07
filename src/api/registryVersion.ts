@@ -1,4 +1,5 @@
 import type { Ecosystem } from "../types";
+import { isWritableEcosystem } from "../scanners/ecosystems";
 import { isPinVersion } from "../store/pinMcp";
 
 export function npmRegistryLatestUrl(packageName: string): string {
@@ -23,7 +24,7 @@ export async function fetchPublishedVersions(
   fetchImpl: typeof fetch = fetch,
 ): Promise<string[] | undefined> {
   const name = packageName.trim();
-  if (!name) {
+  if (!name || !isWritableEcosystem(ecosystem)) {
     return undefined;
   }
   const url = ecosystem === "pypi" ? pypiJsonUrl(name) : npmPackumentUrl(name);
@@ -51,7 +52,7 @@ export async function fetchLatestPackageVersion(
   fetchImpl: typeof fetch = fetch,
 ): Promise<string | undefined> {
   const name = packageName.trim();
-  if (!name) {
+  if (!name || !isWritableEcosystem(ecosystem)) {
     return undefined;
   }
   const url = ecosystem === "pypi" ? pypiJsonUrl(name) : npmRegistryLatestUrl(name);

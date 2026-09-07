@@ -1,8 +1,8 @@
 {
   "name": "chaintrap-agent-shield",
   "displayName": "Chaintrap Agent Shield — AI-Coding Security",
-  "description": "AI-coding supply-chain security: scan npm/PyPI and MCP pins, flag malware and CVEs, then Fix issues — delete known-bad pins and write exact OSV-clean versions. Manifest edits only.",
-  "version": "0.1.33",
+  "description": "AI-coding supply-chain security: scan npm/PyPI/Maven/Go and other OSV ecosystems plus MCP pins, flag malware and CVEs, then Fix issues for npm/PyPI manifests. Detect-only for other ecosystems.",
+  "version": "0.1.34",
   "publisher": "pri17m",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -21,6 +21,7 @@
     "mcp security",
     "osv",
     "npm",
+    "maven",
     "pypi",
     "dependency scanning",
     "dependency security",

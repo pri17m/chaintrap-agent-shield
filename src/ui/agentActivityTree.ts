@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { ecosystemLabel } from "../scanners/ecosystems";
 import type { Finding, Surface } from "../types";
 import { findingTreeCommand, shortPath } from "./findingCopy";
 import { groupDependencyFindings, groupMcpFindings } from "./findingGroups";
@@ -110,7 +111,7 @@ export class FindingItem extends vscode.TreeItem {
         : finding.mcpUrl || finding.mcpCommand || "not a package";
       this.description = `${detail} · ${shortPath(finding.path)}`;
     } else {
-      const eco = finding.ecosystem === "pypi" ? "PyPI" : finding.ecosystem === "npm" ? "npm" : finding.surface;
+      const eco = finding.ecosystem ? ecosystemLabel(finding.ecosystem) : finding.surface;
       this.description = `${eco} · ${finding.source} · ${shortPath(finding.path)}`;
     }
     this.tooltip = finding.message;

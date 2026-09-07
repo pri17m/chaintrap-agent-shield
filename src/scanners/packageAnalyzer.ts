@@ -1,6 +1,7 @@
 import type { Ecosystem, Finding, FindingSource, OsvQuery } from "../types";
 import { classifyOsvIds, fetchOsvSummaries, pickPrimaryOsvId, queryOsvQuerybatch } from "../api/osvClient";
 import { fetchLatestPackageVersion } from "../api/registryVersion";
+import { ecosystemLabel } from "./ecosystems";
 import { matchKnownBad } from "./knownBad";
 
 export interface PackageToAnalyze {
@@ -36,7 +37,7 @@ function pkgFields(pkg: PackageToAnalyze): Pick<Finding, "path" | "packageName" 
 }
 
 function ecoLabel(eco: Ecosystem): string {
-  return eco === "pypi" ? "PyPI" : "npm";
+  return ecosystemLabel(eco);
 }
 
 export function packageFindingCopy(opts: {

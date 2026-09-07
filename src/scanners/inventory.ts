@@ -2,7 +2,33 @@ import * as crypto from "crypto";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import type { Ecosystem, InventoryItem } from "../types";
+import type { CoverageKind, Ecosystem, InventoryItem } from "../types";
+import { isExactVersionString, normalizePackageName } from "./ecosystems";
+import {
+  parseBunLockBody,
+  parseCabalFreeze,
+  parseCargoLock,
+  parseCargoToml,
+  parseComposerLock,
+  parseConanLock,
+  parseDepsJson,
+  parseGemfileLock,
+  parseGithubWorkflowUses,
+  parseGoMod,
+  parseGoSum,
+  parseGradleLockfile,
+  parseGradleVerificationMetadata,
+  parseMixLock,
+  parseNugetPackagesLock,
+  parsePackageResolved,
+  parsePackagesConfig,
+  parsePdmOrPylock,
+  parsePomXml,
+  parsePubspecLock,
+  parsePyprojectToml,
+  parseRenvLock,
+  parseStackYamlLock,
+} from "./ecoParsers";
 import {
   parsePackageLockJson,
   parsePipfileLockJson,
@@ -29,6 +55,8 @@ const SKIP_WALK_DIRS = new Set([
   "coverage",
   "vendor",
   "target",
+  "bin",
+  "obj",
 ]);
 
 const PACKAGE_INVENTORY_FILES = new Set([
@@ -36,14 +64,47 @@ const PACKAGE_INVENTORY_FILES = new Set([
   "package-lock.json",
   "pnpm-lock.yaml",
   "yarn.lock",
+  "bun.lock",
   "uv.lock",
   "poetry.lock",
   "Pipfile.lock",
+  "pdm.lock",
+  "pylock.toml",
+  "pyproject.toml",
   "requirements.txt",
+  "pom.xml",
+  "go.mod",
+  "go.sum",
+  "Cargo.lock",
+  "Cargo.toml",
+  "Gemfile.lock",
+  "gems.locked",
+  "Gemfile",
+  "packages.lock.json",
+  "packages.config",
+  "composer.lock",
+  "composer.json",
+  "pubspec.lock",
+  "pubspec.yaml",
+  "mix.lock",
+  "mix.exs",
+  "Package.resolved",
+  "Package.swift",
+  "cabal.project.freeze",
+  "stack.yaml.lock",
+  "renv.lock",
+  "conan.lock",
+  "conanfile.txt",
+  "conanfile.py",
+  "gradle.lockfile",
+  "buildscript-gradle.lockfile",
+  "verification-metadata.xml",
+  "build.gradle",
+  "build.gradle.kts",
 ]);
 
 function isPackageInventoryFile(name: string): boolean {
-  return PACKAGE_INVENTORY_FILES.has(name);
+  return PACKAGE_INVENTORY_FILES.has(name) || name.endsWith(".deps.json");
 }
 
 /** Skip loading skill/rule bodies larger than this (bytes). */
@@ -105,12 +166,12 @@ function addPackage(
   items: InventoryItem[],
   workspaceRoot: string,
   filePath: string,
-  ecosystem: "npm" | "pypi",
+  ecosystem: Ecosystem,
   name: string,
   version: string,
   extra?: { pinExact?: boolean; spec?: string },
 ): void {
-  const n = name.trim().toLowerCase();
+  const n = normalizePackageName(ecosystem, name);
   const v = version.trim() || "unknown";
   if (!n) {
     return;
@@ -164,8 +225,9 @@ function addCoverageNote(
   workspaceRoot: string,
   filePath: string,
   ecosystem: Ecosystem,
+  coverageKind: CoverageKind = "no-lockfile",
 ): void {
-  const key = `coverage:${ecosystem}-lock:${filePath}`;
+  const key = `coverage:${ecosystem}-${coverageKind}:${filePath}`;
   items.push({
     key,
     kind: "coverage",
@@ -173,7 +235,7 @@ function addCoverageNote(
     hash: sha256(key),
     workspaceRoot,
     ecosystem,
-    coverageKind: "no-lockfile",
+    coverageKind,
   });
 }
 
@@ -185,8 +247,36 @@ function addLockedPackages(
   pkgs: Array<{ name: string; version: string }>,
 ): void {
   for (const p of pkgs) {
-    addPackage(items, workspaceRoot, filePath, ecosystem, p.name, p.version);
+    const exact = isExactVersionString(p.version);
+    addPackage(items, workspaceRoot, filePath, ecosystem, p.name, exact ? p.version : "unknown", {
+      pinExact: exact,
+      spec: exact ? undefined : p.version || "unknown",
+    });
   }
+}
+
+function parseTextLock(
+  filePath: string,
+  workspaceRoot: string,
+  items: InventoryItem[],
+  ecosystem: Ecosystem,
+  parser: (raw: string) => Array<{ name: string; version: string }>,
+): boolean {
+  const raw = readText(filePath);
+  if (!raw) {
+    return false;
+  }
+  try {
+    addLockedPackages(items, workspaceRoot, filePath, ecosystem, parser(raw));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function joinIfExists(dir: string, name: string): string | null {
+  const full = path.join(dir, name);
+  return fs.existsSync(full) ? full : null;
 }
 
 function parsePackageLock(filePath: string, workspaceRoot: string, items: InventoryItem[]): void {
@@ -269,11 +359,11 @@ function parseMcpFile(filePath: string, workspaceRoot: string | undefined, items
     let version = inferred?.version;
     let pinExact: boolean | undefined;
     let spec: string | undefined;
-    if (inferred && version && !isExactNpmSpec(version)) {
+    if (inferred && version && !isExactVersionString(version)) {
       spec = version;
       version = "unknown";
       pinExact = false;
-    } else if (inferred && version && isExactNpmSpec(version)) {
+    } else if (inferred && version && isExactVersionString(version)) {
       pinExact = true;
     }
     const key = `mcp:${filePath}:${server.id}`;
@@ -384,42 +474,176 @@ function discoverPackageDirs(workspaceRoot: string): string[] {
 
 function inventoryPackageDir(dir: string, workspaceRoot: string, items: InventoryItem[]): void {
   const pkgJson = path.join(dir, "package.json");
-  const lock = path.join(dir, "package-lock.json");
-  const pnpm = path.join(dir, "pnpm-lock.yaml");
-  const yarn = path.join(dir, "yarn.lock");
-  const hasNpmLock = fs.existsSync(lock) || fs.existsSync(pnpm) || fs.existsSync(yarn);
-  if (hasNpmLock) {
-    if (fs.existsSync(lock)) {
-      parsePackageLock(lock, workspaceRoot, items);
-    }
-    if (fs.existsSync(pnpm)) {
-      parsePnpmLock(pnpm, workspaceRoot, items);
-    }
-    if (fs.existsSync(yarn)) {
-      parseYarnLock(yarn, workspaceRoot, items);
+  const npmLocks = [
+    joinIfExists(dir, "package-lock.json"),
+    joinIfExists(dir, "pnpm-lock.yaml"),
+    joinIfExists(dir, "yarn.lock"),
+    joinIfExists(dir, "bun.lock"),
+  ].filter((p): p is string => Boolean(p));
+  if (npmLocks.length) {
+    for (const lockPath of npmLocks) {
+      const base = path.basename(lockPath);
+      if (base === "package-lock.json") {
+        parsePackageLock(lockPath, workspaceRoot, items);
+      } else if (base === "pnpm-lock.yaml") {
+        parsePnpmLock(lockPath, workspaceRoot, items);
+      } else if (base === "yarn.lock") {
+        parseYarnLock(lockPath, workspaceRoot, items);
+      } else if (base === "bun.lock") {
+        parseTextLock(lockPath, workspaceRoot, items, "npm", parseBunLockBody);
+      }
     }
   } else if (fs.existsSync(pkgJson)) {
     parsePackageJson(pkgJson, workspaceRoot, items);
     addCoverageNote(items, workspaceRoot, pkgJson, "npm");
   }
-  const uv = path.join(dir, "uv.lock");
-  const poetry = path.join(dir, "poetry.lock");
-  const pipfile = path.join(dir, "Pipfile.lock");
-  const req = path.join(dir, "requirements.txt");
-  const hasPyLock = fs.existsSync(uv) || fs.existsSync(poetry) || fs.existsSync(pipfile);
-  if (hasPyLock) {
-    if (fs.existsSync(uv)) {
-      parseTomlLock(uv, workspaceRoot, items);
+
+  const pypiLocks = [
+    joinIfExists(dir, "uv.lock"),
+    joinIfExists(dir, "poetry.lock"),
+    joinIfExists(dir, "Pipfile.lock"),
+    joinIfExists(dir, "pdm.lock"),
+    joinIfExists(dir, "pylock.toml"),
+  ].filter((p): p is string => Boolean(p));
+  const req = joinIfExists(dir, "requirements.txt");
+  const pyproject = joinIfExists(dir, "pyproject.toml");
+  if (pypiLocks.length) {
+    for (const lockPath of pypiLocks) {
+      const base = path.basename(lockPath);
+      if (base === "Pipfile.lock") {
+        parsePipfileLock(lockPath, workspaceRoot, items);
+      } else if (base === "pdm.lock" || base === "pylock.toml") {
+        parseTextLock(lockPath, workspaceRoot, items, "pypi", parsePdmOrPylock);
+      } else {
+        parseTomlLock(lockPath, workspaceRoot, items);
+      }
     }
-    if (fs.existsSync(poetry)) {
-      parseTomlLock(poetry, workspaceRoot, items);
+  } else {
+    if (req) {
+      parseRequirements(req, workspaceRoot, items);
+      addCoverageNote(items, workspaceRoot, req, "pypi");
     }
-    if (fs.existsSync(pipfile)) {
-      parsePipfileLock(pipfile, workspaceRoot, items);
+    if (pyproject) {
+      parseTextLock(pyproject, workspaceRoot, items, "pypi", parsePyprojectToml);
+      addCoverageNote(items, workspaceRoot, pyproject, "pypi");
     }
-  } else if (fs.existsSync(req)) {
-    parseRequirements(req, workspaceRoot, items);
-    addCoverageNote(items, workspaceRoot, req, "pypi");
+  }
+
+  const gradleLocks = [
+    joinIfExists(dir, "gradle.lockfile"),
+    joinIfExists(dir, "buildscript-gradle.lockfile"),
+    joinIfExists(dir, "verification-metadata.xml"),
+  ].filter((p): p is string => Boolean(p));
+  const pom = joinIfExists(dir, "pom.xml");
+  const gradleDsl = joinIfExists(dir, "build.gradle") || joinIfExists(dir, "build.gradle.kts");
+  if (gradleLocks.length) {
+    for (const lockPath of gradleLocks) {
+      const parser = path.basename(lockPath) === "verification-metadata.xml" ? parseGradleVerificationMetadata : parseGradleLockfile;
+      parseTextLock(lockPath, workspaceRoot, items, "maven", parser);
+    }
+  } else if (pom) {
+    parseTextLock(pom, workspaceRoot, items, "maven", parsePomXml);
+    addCoverageNote(items, workspaceRoot, pom, "maven");
+  } else if (gradleDsl) {
+    addCoverageNote(items, workspaceRoot, gradleDsl, "maven", "unscanned");
+  }
+
+  const goSum = joinIfExists(dir, "go.sum");
+  const goMod = joinIfExists(dir, "go.mod");
+  if (goSum) {
+    parseTextLock(goSum, workspaceRoot, items, "go", parseGoSum);
+  } else if (goMod) {
+    parseTextLock(goMod, workspaceRoot, items, "go", parseGoMod);
+    addCoverageNote(items, workspaceRoot, goMod, "go");
+  }
+
+  const cargoLock = joinIfExists(dir, "Cargo.lock");
+  const cargoToml = joinIfExists(dir, "Cargo.toml");
+  if (cargoLock) {
+    parseTextLock(cargoLock, workspaceRoot, items, "crates", parseCargoLock);
+  } else if (cargoToml) {
+    parseTextLock(cargoToml, workspaceRoot, items, "crates", parseCargoToml);
+    addCoverageNote(items, workspaceRoot, cargoToml, "crates");
+  }
+
+  const gemLock = joinIfExists(dir, "Gemfile.lock") || joinIfExists(dir, "gems.locked");
+  const gemfile = joinIfExists(dir, "Gemfile");
+  if (gemLock) {
+    parseTextLock(gemLock, workspaceRoot, items, "rubygems", parseGemfileLock);
+  } else if (gemfile) {
+    addCoverageNote(items, workspaceRoot, gemfile, "rubygems", "unscanned");
+  }
+
+  const nugetLock = joinIfExists(dir, "packages.lock.json");
+  const packagesConfig = joinIfExists(dir, "packages.config");
+  if (nugetLock) {
+    parseTextLock(nugetLock, workspaceRoot, items, "nuget", parseNugetPackagesLock);
+  } else if (packagesConfig) {
+    parseTextLock(packagesConfig, workspaceRoot, items, "nuget", parsePackagesConfig);
+    addCoverageNote(items, workspaceRoot, packagesConfig, "nuget");
+  }
+  try {
+    const entries = fs.readdirSync(dir);
+    for (const name of entries) {
+      if (name.endsWith(".deps.json")) {
+        parseTextLock(path.join(dir, name), workspaceRoot, items, "nuget", parseDepsJson);
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
+  const composerLock = joinIfExists(dir, "composer.lock");
+  const composerJson = joinIfExists(dir, "composer.json");
+  if (composerLock) {
+    parseTextLock(composerLock, workspaceRoot, items, "packagist", parseComposerLock);
+  } else if (composerJson) {
+    addCoverageNote(items, workspaceRoot, composerJson, "packagist", "unscanned");
+  }
+
+  const pubLock = joinIfExists(dir, "pubspec.lock");
+  const pubspec = joinIfExists(dir, "pubspec.yaml");
+  if (pubLock) {
+    parseTextLock(pubLock, workspaceRoot, items, "pub", parsePubspecLock);
+  } else if (pubspec) {
+    addCoverageNote(items, workspaceRoot, pubspec, "pub", "unscanned");
+  }
+
+  const mixLock = joinIfExists(dir, "mix.lock");
+  const mixExs = joinIfExists(dir, "mix.exs");
+  if (mixLock) {
+    parseTextLock(mixLock, workspaceRoot, items, "hex", parseMixLock);
+  } else if (mixExs) {
+    addCoverageNote(items, workspaceRoot, mixExs, "hex", "unscanned");
+  }
+
+  const packageResolved = joinIfExists(dir, "Package.resolved");
+  const packageSwift = joinIfExists(dir, "Package.swift");
+  if (packageResolved) {
+    parseTextLock(packageResolved, workspaceRoot, items, "swift", parsePackageResolved);
+  } else if (packageSwift) {
+    addCoverageNote(items, workspaceRoot, packageSwift, "swift", "unscanned");
+  }
+
+  const cabalFreeze = joinIfExists(dir, "cabal.project.freeze");
+  const stackLock = joinIfExists(dir, "stack.yaml.lock");
+  if (cabalFreeze) {
+    parseTextLock(cabalFreeze, workspaceRoot, items, "hackage", parseCabalFreeze);
+  } else if (stackLock) {
+    parseTextLock(stackLock, workspaceRoot, items, "hackage", parseStackYamlLock);
+  }
+
+  const renv = joinIfExists(dir, "renv.lock");
+  if (renv) {
+    parseTextLock(renv, workspaceRoot, items, "cran", parseRenvLock);
+  }
+
+  const conanLock = joinIfExists(dir, "conan.lock");
+  const conanfile = joinIfExists(dir, "conanfile.txt") || joinIfExists(dir, "conanfile.py");
+  if (conanLock) {
+    parseTextLock(conanLock, workspaceRoot, items, "conan", parseConanLock);
+  } else if (conanfile) {
+    addCoverageNote(items, workspaceRoot, conanfile, "conan", "unscanned");
   }
 }
 
@@ -460,6 +684,15 @@ export function inventoryWorkspaceRoot(workspaceRoot: string): InventoryItem[] {
     }
   }
   parseTextFiles(ruleFiles, "rule", workspaceRoot, items);
+  const workflowFiles: string[] = [];
+  walkFiles(
+    path.join(workspaceRoot, ".github", "workflows"),
+    (n) => n.endsWith(".yml") || n.endsWith(".yaml"),
+    workflowFiles,
+  );
+  for (const wf of workflowFiles) {
+    parseTextLock(wf, workspaceRoot, items, "github_actions", parseGithubWorkflowUses);
+  }
   return items;
 }
 
