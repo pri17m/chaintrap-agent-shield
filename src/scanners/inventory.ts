@@ -12,6 +12,7 @@ import {
   parseComposerLock,
   parseConanLock,
   parseDepsJson,
+  parseGemfileExact,
   parseGemfileLock,
   parseGithubWorkflowUses,
   parseGoMod,
@@ -571,7 +572,8 @@ function inventoryPackageDir(dir: string, workspaceRoot: string, items: Inventor
   if (gemLock) {
     parseTextLock(gemLock, workspaceRoot, items, "rubygems", parseGemfileLock);
   } else if (gemfile) {
-    addCoverageNote(items, workspaceRoot, gemfile, "rubygems", "unscanned");
+    parseTextLock(gemfile, workspaceRoot, items, "rubygems", parseGemfileExact);
+    addCoverageNote(items, workspaceRoot, gemfile, "rubygems");
   }
 
   const nugetLock = joinIfExists(dir, "packages.lock.json");

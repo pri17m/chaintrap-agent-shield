@@ -1,4 +1,40 @@
-import type { Finding } from "../types";
+import { ECOSYSTEMS, ecosystemLabel } from "../scanners/ecosystems";
+import type { Ecosystem, Finding } from "../types";
+
+export interface EcosystemFindingGroup {
+  ecosystem: string;
+  label: string;
+  findings: Finding[];
+}
+
+/** Keep ecosystem order from ECOSYSTEMS so Maven/crates are not buried under npm. */
+export function groupFindingsByEcosystem(findings: Finding[]): EcosystemFindingGroup[] {
+  const map = new Map<string, Finding[]>();
+  for (const f of findings) {
+    const key = f.ecosystem || "other";
+    const list = map.get(key);
+    if (list) {
+      list.push(f);
+    } else {
+      map.set(key, [f]);
+    }
+  }
+  const order = [...ECOSYSTEMS, "other"];
+  const out: EcosystemFindingGroup[] = [];
+  for (const key of order) {
+    const list = map.get(key);
+    if (!list?.length) {
+      continue;
+    }
+    const label = key === "other" ? "other" : ecosystemLabel(key as Ecosystem);
+    out.push({ ecosystem: key, label, findings: list });
+    map.delete(key);
+  }
+  for (const [key, list] of map) {
+    out.push({ ecosystem: key, label: key, findings: list });
+  }
+  return out;
+}
 
 export function isManifestPackage(f: Finding): boolean {
   return f.surface === "package" && Boolean(f.packageName);

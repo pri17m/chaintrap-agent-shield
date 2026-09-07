@@ -273,6 +273,27 @@ export function parseGemfileLock(raw: string): LockedPackage[] {
   return out;
 }
 
+/** Exact `gem "name", "1.2.3"` pins. Unversioned gems are unknown. */
+export function parseGemfileExact(raw: string): LockedPackage[] {
+  const out: LockedPackage[] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t || t.startsWith("#")) {
+      continue;
+    }
+    const exact = t.match(/^gem\s+["']([^"']+)["']\s*,\s*["']([^"']+)["']/);
+    if (exact) {
+      out.push({ name: exact[1], version: exact[2] });
+      continue;
+    }
+    const nameOnly = t.match(/^gem\s+["']([^"']+)["']/);
+    if (nameOnly) {
+      out.push({ name: nameOnly[1], version: "unknown" });
+    }
+  }
+  return out;
+}
+
 export function parseNugetPackagesLock(raw: string): LockedPackage[] {
   let doc: unknown;
   try {

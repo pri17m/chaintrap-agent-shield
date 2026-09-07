@@ -3,10 +3,13 @@ import type { Finding } from "../types";
 import { pinPackageTokenInMcpServer } from "./mcpJsonEdit";
 import { stringifyMcpConfig } from "./uninstall";
 
-/** Exact version token we will write into mcp.json. No dist-tags, ranges, or URLs. */
+/** Exact version token we will write into mcp.json. Allows Go v-prefix. No dist-tags, ranges, or URLs. */
 export function isPinVersion(raw: string): boolean {
   const v = raw.trim();
-  return /^[0-9][A-Za-z0-9._+-]{0,63}$/.test(v);
+  if (!v || v.toLowerCase() === "latest" || v === "*" || /^[><=^~]/.test(v)) {
+    return false;
+  }
+  return /^v?[0-9][A-Za-z0-9._+-]{0,63}$/.test(v);
 }
 
 /** Prefer the version already resolved during scan; never a dist-tag. */
@@ -56,6 +59,62 @@ export function pinPypiSpecToken(token: string, packageName: string, version: st
   return `${eq ? eq[1] : t.split("==")[0]}==${version}`;
 }
 
+export function pinGoSpecToken(token: string, packageName: string, version: string): string {
+  const t = token.trim();
+  const at = t.lastIndexOf("@");
+  const mod = at > 0 ? t.slice(0, at) : t;
+  if (mod !== packageName) {
+    return token;
+  }
+  const ver = version.startsWith("v") || !/^\d/.test(version) ? version : `v${version}`;
+  return `${mod}@${ver}`;
+}
+
+export function pinCargoSpecToken(token: string, packageName: string, version: string): string {
+  const t = token.trim();
+  const at = t.lastIndexOf("@");
+  const name = at > 0 ? t.slice(0, at) : t;
+  if (name !== packageName) {
+    return token;
+  }
+  return `${name}@${version}`;
+}
+
+export function pinCargoArgs(args: unknown[], packageName: string, version: string): { args: unknown[]; changed: boolean } {
+  let changed = false;
+  const next = args.map((a, i, arr) => {
+    if (typeof a !== "string") {
+      return a;
+    }
+    const prev = i > 0 ? String(arr[i - 1]) : "";
+    if ((prev === "--version" || prev === "-V") && /^[0-9v]/.test(a)) {
+      changed = true;
+      return version;
+    }
+    const pinned = pinCargoSpecToken(a, packageName, version);
+    if (pinned !== a) {
+      changed = true;
+    }
+    return pinned;
+  });
+  if (!changed) {
+    let sawName = false;
+    const withFlag: unknown[] = [];
+    for (const a of next) {
+      withFlag.push(a);
+      if (typeof a === "string" && a === packageName) {
+        sawName = true;
+        withFlag.push("--version", version);
+        changed = true;
+      }
+    }
+    if (sawName && changed) {
+      return { args: withFlag, changed: true };
+    }
+  }
+  return { args: next, changed };
+}
+
 function pinArgsWith(
   args: unknown[],
   packageName: string,
@@ -103,7 +162,7 @@ export function pinMcpServerById(
       }
       const parsed = parseMcpConfigJson(JSON.stringify({ mcpServers: { [id]: value } }))[0];
       const inferred = parsed ? inferredFromMcpServer(parsed) : null;
-      if (!inferred || (inferred.ecosystem !== "npm" && inferred.ecosystem !== "pypi")) {
+      if (!inferred || !["npm", "pypi", "go", "crates"].includes(inferred.ecosystem)) {
         next[id] = value;
         continue;
       }
@@ -116,8 +175,18 @@ export function pinMcpServerById(
         }
       }
       const row = value as Record<string, unknown>;
-      const pinToken = inferred.ecosystem === "pypi" ? pinPypiSpecToken : pinNpmSpecToken;
-      const result = pinArgsWith(parsed.args, inferred.name, version.trim(), pinToken);
+      let result: { args: unknown[]; changed: boolean };
+      if (inferred.ecosystem === "crates") {
+        result = pinCargoArgs(parsed.args, inferred.name, version.trim());
+      } else {
+        const pinToken =
+          inferred.ecosystem === "pypi"
+            ? pinPypiSpecToken
+            : inferred.ecosystem === "go"
+              ? pinGoSpecToken
+              : pinNpmSpecToken;
+        result = pinArgsWith(parsed.args, inferred.name, version.trim(), pinToken);
+      }
       if (!result.changed) {
         next[id] = value;
         continue;
@@ -148,7 +217,7 @@ export function pinMcpServerById(
     want,
     packageName,
     version.trim(),
-    ecosystem === "pypi" ? pinPypiSpecToken : pinNpmSpecToken,
+    ecosystem === "pypi" ? pinPypiSpecToken : ecosystem === "go" ? pinGoSpecToken : ecosystem === "crates" ? pinCargoSpecToken : pinNpmSpecToken,
   );
   if (surgical.pinned) {
     return { next: surgical.next, pinned: true, packageName, ecosystem };

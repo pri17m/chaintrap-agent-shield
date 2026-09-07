@@ -2,13 +2,15 @@ import * as vscode from "vscode";
 import { ecosystemLabel } from "../scanners/ecosystems";
 import type { Finding, Surface } from "../types";
 import { findingTreeCommand, shortPath } from "./findingCopy";
-import { groupDependencyFindings, groupMcpFindings } from "./findingGroups";
+import { groupDependencyFindings, groupFindingsByEcosystem, groupMcpFindings } from "./findingGroups";
 
 export type ActivityKind = "malicious" | "vulnerable" | "unpinned" | "unchecked";
 export type TreeSurface = Extract<Surface, "package" | "mcp">;
 
-export class AgentActivityProvider implements vscode.TreeDataProvider<FindingItem | GroupItem> {
-  private readonly _onDidChangeTreeData = new vscode.EventEmitter<FindingItem | GroupItem | undefined>();
+export type ActivityTreeNode = FindingItem | GroupItem | EcoGroupItem;
+
+export class AgentActivityProvider implements vscode.TreeDataProvider<ActivityTreeNode> {
+  private readonly _onDidChangeTreeData = new vscode.EventEmitter<ActivityTreeNode | undefined>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
   private findings: Finding[] = [];
 
@@ -19,11 +21,11 @@ export class AgentActivityProvider implements vscode.TreeDataProvider<FindingIte
     this._onDidChangeTreeData.fire(undefined);
   }
 
-  getTreeItem(element: FindingItem | GroupItem): vscode.TreeItem {
+  getTreeItem(element: ActivityTreeNode): vscode.TreeItem {
     return element;
   }
 
-  getChildren(element?: FindingItem | GroupItem): (FindingItem | GroupItem)[] {
+  getChildren(element?: ActivityTreeNode): ActivityTreeNode[] {
     if (this.surface === "mcp") {
       const grouped = groupMcpFindings(this.findings);
       if (!element) {
@@ -57,7 +59,12 @@ export class AgentActivityProvider implements vscode.TreeDataProvider<FindingIte
     }
     if (element instanceof GroupItem) {
       const list = element.kind === "malicious" ? grouped.malicious : grouped.vulnerable;
-      return list.map((f) => new FindingItem(f, element.kind, "package"));
+      return groupFindingsByEcosystem(list).map(
+        (g) => new EcoGroupItem(element.kind, g.ecosystem, `${g.label} (${g.findings.length})`, g.findings),
+      );
+    }
+    if (element instanceof EcoGroupItem) {
+      return element.findings.map((f) => new FindingItem(f, element.kind, "package"));
     }
     return [];
   }
@@ -89,6 +96,19 @@ export class GroupItem extends vscode.TreeItem {
     } else if (kind === "unchecked") {
       this.tooltip = "URL, docker, or binary MCP servers — not npm/PyPI packages, so they are listed only.";
     }
+  }
+}
+
+export class EcoGroupItem extends vscode.TreeItem {
+  constructor(
+    readonly kind: ActivityKind,
+    readonly ecosystem: string,
+    label: string,
+    readonly findings: Finding[],
+  ) {
+    super(label, vscode.TreeItemCollapsibleState.Expanded);
+    this.contextValue = "ecosystemGroup";
+    this.tooltip = `${label} in this workspace`;
   }
 }
 

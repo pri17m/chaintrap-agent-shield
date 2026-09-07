@@ -14,10 +14,11 @@ export async function resolveLatestPinVersion(
   if (cached) {
     return cached;
   }
-  if (!finding.packageName || !isWritableEcosystem(finding.ecosystem)) {
+  const eco = finding.ecosystem;
+  if (!finding.packageName || !eco || !isWritableEcosystem(eco)) {
     return undefined;
   }
-  return fetchLatestPackageVersion(finding.ecosystem === "pypi" ? "pypi" : "npm", finding.packageName, fetchImpl ?? fetch);
+  return fetchLatestPackageVersion(eco, finding.packageName, fetchImpl ?? fetch);
 }
 
 export async function pinMcpFinding(finding: Finding): Promise<boolean> {
@@ -25,9 +26,9 @@ export async function pinMcpFinding(finding: Finding): Promise<boolean> {
     void vscode.window.showWarningMessage("Only unpinned MCP servers can be pinned from this view.");
     return false;
   }
-  if (finding.ecosystem && finding.ecosystem !== "npm") {
+  if (finding.ecosystem && finding.ecosystem !== "npm" && finding.ecosystem !== "pypi" && finding.ecosystem !== "go" && finding.ecosystem !== "crates") {
     void vscode.window.showWarningMessage(
-      "Pin writes package@version into npx args. Python/-m servers are not pinned this way.",
+      "Pin writes a version into mcp.json args. This server kind cannot be pinned that way.",
     );
     return false;
   }

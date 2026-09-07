@@ -85,7 +85,9 @@ suite("multi-ecosystem parsers", () => {
     assert.strictEqual(osvEcosystemName("github_actions"), "GitHub Actions");
     assert.strictEqual(ecosystemLabel("pypi"), "PyPI");
     assert.ok(isWritableEcosystem("npm"));
-    assert.ok(!isWritableEcosystem("maven"));
+    assert.ok(isWritableEcosystem("maven"));
+    assert.ok(!isWritableEcosystem("swift"));
+    assert.ok(!isWritableEcosystem("hex"));
     assert.ok(isExactVersionString("0.13.0"));
     assert.ok(isExactVersionString("v1.2.3"));
     assert.ok(!isExactVersionString("^1.0.0"));
@@ -160,7 +162,8 @@ suite("multi-ecosystem inventory", () => {
     fs.writeFileSync(path.join(root, "Package.swift"), "// swift-tools-version: 5.9\n", "utf8");
     fs.writeFileSync(path.join(root, "conanfile.txt"), "[requires]\nzlib/1.2.13\n", "utf8");
     const items = inventoryWorkspaceRoot(root);
-    assert.ok(items.some((i) => i.coverageKind === "unscanned" && i.ecosystem === "rubygems"));
+    assert.ok(items.some((i) => i.ecosystem === "rubygems" && i.packageName === "rails" && i.pinExact === false));
+    assert.ok(items.some((i) => i.coverageKind === "no-lockfile" && i.ecosystem === "rubygems"));
     assert.ok(items.some((i) => i.coverageKind === "unscanned" && i.ecosystem === "hex"));
     assert.ok(items.some((i) => i.coverageKind === "unscanned" && i.ecosystem === "swift"));
     assert.ok(items.some((i) => i.coverageKind === "unscanned" && i.ecosystem === "conan"));
@@ -186,7 +189,18 @@ suite("multi-ecosystem MCP + fix skip", () => {
     });
   });
 
-  test("Fix issues skips Maven pins", () => {
+  test("Fix issues pins Maven pom.xml when the file exists", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "eco-fix-maven-"));
+    const pom = path.join(root, "pom.xml");
+    fs.writeFileSync(
+      pom,
+      `<project><dependencies><dependency>
+        <groupId>io.modelcontextprotocol</groupId>
+        <artifactId>kotlin-sdk</artifactId>
+        <version>0.13.0</version>
+      </dependency></dependencies></project>`,
+      "utf8",
+    );
     const f: Finding = {
       id: "m",
       source: "baseline",
@@ -194,13 +208,50 @@ suite("multi-ecosystem MCP + fix skip", () => {
       severity: "high",
       title: "vuln",
       message: "msg",
-      path: "/r/pom.xml",
+      path: pom,
       packageName: "io.modelcontextprotocol:kotlin-sdk",
       version: "0.13.0",
       ecosystem: "maven",
       acknowledged: false,
       createdAt: "2026-09-07T00:00:00.000Z",
+      workspaceRoot: root,
     };
-    assert.strictEqual(shouldSkipFinding(f), "Fix issues only edits npm/PyPI manifests");
+    assert.strictEqual(shouldSkipFinding(f), undefined);
+  });
+
+  test("Fix issues skips hashed Cargo.lock without Cargo.toml", () => {
+    const f: Finding = {
+      id: "c",
+      source: "baseline",
+      surface: "package",
+      severity: "medium",
+      title: "vuln",
+      message: "msg",
+      path: "/tmp/missing-lock/Cargo.lock",
+      packageName: "time",
+      version: "0.1.44",
+      ecosystem: "crates",
+      acknowledged: false,
+      createdAt: "2026-09-07T00:00:00.000Z",
+    };
+    assert.strictEqual(shouldSkipFinding(f), "hashed lockfile only; add a sibling manifest");
+  });
+
+  test("Fix issues skips Swift", () => {
+    const f: Finding = {
+      id: "s",
+      source: "baseline",
+      surface: "package",
+      severity: "medium",
+      title: "vuln",
+      message: "msg",
+      path: "/tmp/Package.resolved",
+      packageName: "github.com/apple/swift-nio",
+      version: "2.32.0",
+      ecosystem: "swift",
+      acknowledged: false,
+      createdAt: "2026-09-07T00:00:00.000Z",
+    };
+    assert.strictEqual(shouldSkipFinding(f), "Swift Package.swift is source; not edited");
   });
 });

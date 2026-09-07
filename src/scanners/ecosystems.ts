@@ -84,8 +84,59 @@ export function lockfileHint(eco: Ecosystem): string {
   return LOCK_HINT[eco] || "a lockfile";
 }
 
+/** Ecosystems Fix issues can write a manifest for. Swift/Hex DSLs are detect-only. */
 export function isWritableEcosystem(eco?: Ecosystem): boolean {
-  return eco === "npm" || eco === "pypi";
+  return Boolean(eco) && eco !== "swift" && eco !== "hex";
+}
+
+/** Lockfiles with checksums — never rewritten; look for a sibling manifest instead. */
+export const HASHED_LOCK_BASENAMES = new Set([
+  "cargo.lock",
+  "go.sum",
+  "gemfile.lock",
+  "gems.locked",
+  "composer.lock",
+  "mix.lock",
+  "package.resolved",
+  "pubspec.lock",
+]);
+
+export function isHashedLockPath(filePath: string): boolean {
+  const base = filePath.replace(/\\/g, "/").split("/").pop()?.toLowerCase() || "";
+  return HASHED_LOCK_BASENAMES.has(base);
+}
+
+export function siblingManifestNames(eco: Ecosystem): string[] {
+  switch (eco) {
+    case "npm":
+      return ["package.json"];
+    case "pypi":
+      return ["requirements.txt", "pyproject.toml"];
+    case "maven":
+      return ["pom.xml"];
+    case "go":
+      return ["go.mod"];
+    case "crates":
+      return ["Cargo.toml"];
+    case "rubygems":
+      return ["Gemfile"];
+    case "nuget":
+      return ["packages.config", "packages.lock.json"];
+    case "packagist":
+      return ["composer.json"];
+    case "pub":
+      return ["pubspec.yaml"];
+    case "hackage":
+      return ["cabal.project.freeze"];
+    case "cran":
+      return ["renv.lock"];
+    case "conan":
+      return ["conan.lock"];
+    case "github_actions":
+      return [];
+    default:
+      return [];
+  }
 }
 
 export function normalizePackageName(eco: Ecosystem, name: string): string {
@@ -93,7 +144,7 @@ export function normalizePackageName(eco: Ecosystem, name: string): string {
   if (!n) {
     return "";
   }
-  if (eco === "go" || eco === "swift") {
+  if (eco === "go" || eco === "swift" || eco === "maven" || eco === "nuget") {
     return n;
   }
   if (eco === "pypi" || eco === "rubygems" || eco === "cran") {

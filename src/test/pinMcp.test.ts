@@ -1,10 +1,18 @@
 import * as assert from "assert";
-import { fetchLatestPackageVersion, npmRegistryLatestUrl, pypiJsonUrl } from "../api/registryVersion";
+import {
+  fetchLatestPackageVersion,
+  fetchPublishedVersions,
+  goProxyListUrl,
+  mavenMetadataUrl,
+  npmRegistryLatestUrl,
+  pypiJsonUrl,
+} from "../api/registryVersion";
 import { isPinVersion, pinMcpServerById, pinNpmSpecToken } from "../store/pinMcp";
 
 suite("pinMcp", () => {
   test("isPinVersion accepts exact versions only", () => {
     assert.strictEqual(isPinVersion("1.2.3"), true);
+    assert.strictEqual(isPinVersion("v1.6.3"), true);
     assert.strictEqual(isPinVersion("0.4.1-beta.1"), true);
     assert.strictEqual(isPinVersion("latest"), false);
     assert.strictEqual(isPinVersion("^1.2.3"), false);
@@ -85,5 +93,24 @@ suite("registryVersion", () => {
       ({ ok: true, json: async () => ({ version: "latest" }) }) as Response;
     const v = await fetchLatestPackageVersion("npm", "left-pad", fakeFetch);
     assert.strictEqual(v, undefined);
+  });
+
+  test("fetchPublishedVersions reads Maven metadata and Go proxy lists", async () => {
+    const mavenUrl = mavenMetadataUrl("org.apache.logging.log4j:log4j-core");
+    const goUrl = goProxyListUrl("github.com/gin-gonic/gin");
+    const fakeFetch: typeof fetch = async (url) => {
+      const u = String(url);
+      if (u === mavenUrl) {
+        return { ok: true, text: async () => "<metadata><versioning><versions><version>2.14.1</version><version>2.17.2</version></versions></versioning></metadata>" } as Response;
+      }
+      if (u === goUrl) {
+        return { ok: true, text: async () => "v1.6.3\nv1.9.1\n" } as Response;
+      }
+      throw new Error(`unexpected url ${u}`);
+    };
+    const maven = await fetchPublishedVersions("maven", "org.apache.logging.log4j:log4j-core", fakeFetch);
+    const go = await fetchPublishedVersions("go", "github.com/gin-gonic/gin", fakeFetch);
+    assert.deepStrictEqual(maven, ["2.14.1", "2.17.2"]);
+    assert.deepStrictEqual(go, ["v1.6.3", "v1.9.1"]);
   });
 });

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.35
+
+- Dependencies tree groups malicious/vulnerable packages by ecosystem (npm, PyPI, Maven, crates.io, …)
+- Preserve Maven/NuGet package case so OSV matches (`System.Text.Encodings.Web`, not lowercased)
+- Watch `Gemfile`, `composer.json`, `pubspec.yaml`, `mix.exs`, `Package.swift`, `conanfile.txt` / `conanfile.py`
+- Fix issues is manifest-first: pin/delete on `pom.xml`, `go.mod`, `Cargo.toml`, `Gemfile`, `composer.json`, `pubspec.yaml`, NuGet, Hackage, CRAN, Conan, GitHub Actions workflows, plus existing npm/PyPI/`mcp.json`. Hashed lockfiles (`Cargo.lock`, `go.sum`, `Gemfile.lock`, …) are never rewritten; a sibling manifest is required
+- Skip Swift `Package.swift`, Hex `mix.exs`, Gradle DSL, git/file specs, and lock-only trees
+- Registry version lists for Maven, Go, crates.io, RubyGems, NuGet, Packagist, Pub, Hex, Hackage, CRAN, Conan, GitHub tags (no `mvn`/`cargo`/`go` spawn)
+- MCP pin/delete for `go run module@vX`, `cargo install --version`, and `pipx`; Go `v1.6.3` pins are valid
+
 ## 0.1.34
 
 - Detect-only inventory for OSV ecosystems beyond npm/PyPI: Maven (`pom.xml`, Gradle lockfiles), Go, crates.io, RubyGems, NuGet, Packagist, GitHub Actions, Pub, Hex, Swift, Hackage, CRAN, Conan

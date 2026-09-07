@@ -1,34 +1,15 @@
-import * as fs from "fs";
-import * as path from "path";
 import * as vscode from "vscode";
+import { resolveWritableManifestPath } from "../store/ecoManifest";
 import { applyFixToText } from "../store/fixApply";
 import { formatFixPreview, planFixActions, type FixAction } from "../store/fixPlan";
 import type { Finding } from "../types";
 import { readWorkspaceText, writeWorkspaceText } from "./workspaceText";
 
-function findManifest(finding: Finding, fileName: string): string | undefined {
-  if (path.basename(finding.path).toLowerCase() === fileName.toLowerCase() && fs.existsSync(finding.path)) {
-    return finding.path;
-  }
-  const dirs = [path.dirname(finding.path), finding.workspaceRoot].filter((d): d is string => Boolean(d));
-  for (const dir of dirs) {
-    const p = path.join(dir, fileName);
-    if (fs.existsSync(p)) {
-      return p;
-    }
-  }
-  return undefined;
-}
-
 export function resolveFixPath(action: FixAction): string | undefined {
-  const f = action.finding;
-  if (f.surface === "mcp") {
-    return f.path;
+  if (action.finding.surface === "mcp") {
+    return action.finding.path;
   }
-  if (f.ecosystem === "pypi") {
-    return findManifest(f, "requirements.txt");
-  }
-  return findManifest(f, "package.json");
+  return resolveWritableManifestPath(action.finding);
 }
 
 export async function applyFixActions(actions: FixAction[]): Promise<Finding[]> {
@@ -43,7 +24,7 @@ export async function applyFixActions(actions: FixAction[]): Promise<Finding[]> 
       continue;
     }
     const raw = texts.has(filePath) ? texts.get(filePath)! : readWorkspaceText(filePath);
-    const { next, ok } = applyFixToText(action, raw);
+    const { next, ok } = applyFixToText(action, raw, filePath);
     if (!ok) {
       continue;
     }

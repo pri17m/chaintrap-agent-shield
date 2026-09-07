@@ -55,7 +55,7 @@ export function parseSemver(raw: string): SemVer | undefined {
   }
   const noLocal = s.split("+")[0];
   const stripped = noLocal.replace(/\.post\d+$/i, "");
-  const m = stripped.match(/^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z.-]+))?$/);
+  const m = stripped.match(/^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:\.\d+)*(?:-([0-9A-Za-z.-]+))?$/);
   if (!m) {
     return undefined;
   }

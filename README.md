@@ -33,11 +33,11 @@ The confirm dialog groups every action and says why:
 <ul style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
 <li><b>Delete</b> known-bad or OSV malware pins (and that MCP server) from the manifest.</li>
 <li><b>Pin / upgrade</b> unpinned or range specs, and vulnerable exact pins, to the highest OSV-clean version that fits (same major first; later major only if every same-major release is still dirty).</li>
-<li><b>Skip</b> what cannot be edited safely: URL/docker MCP, git/file specs, lockfile-only coverage, non-npm/PyPI ecosystems, or no clean published version.</li>
+<li><b>Skip</b> what cannot be edited safely: URL/docker MCP, git/file specs, hashed lockfile with no sibling manifest, Swift/Hex/Gradle DSLs, or no clean published version.</li>
 </ul>
 
 <p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif; line-height: 1.55;">
-Edits <code>package.json</code>, <code>requirements.txt</code>, and <code>mcp.json</code> only. It does <b>not</b> run <code>npm</code>, <code>npx</code>, or <code>pip</code>. After a write, posture counts refresh from disk and <b>Checked this workspace</b> records when Fix issues last ran and when malware/CVE last hit zero.
+Edits manifests (<code>package.json</code>, <code>requirements.txt</code>, <code>pom.xml</code>, <code>go.mod</code>, <code>Cargo.toml</code>, <code>Gemfile</code>, <code>composer.json</code>, <code>pubspec.yaml</code>, <code>mcp.json</code>, and similar). It does <b>not</b> rewrite hashed lockfiles and does <b>not</b> run <code>npm</code>, <code>npx</code>, <code>pip</code>, <code>cargo</code>, <code>go</code>, or <code>mvn</code>. After a write, posture counts refresh from disk and <b>Checked this workspace</b> records when Fix issues last ran and when malware/CVE last hit zero.
 </p>
 
 <img src="media/screenshots/fix-issues-dialog.png" alt="Fix issues confirm dialog: delete malware, pin or upgrade vulnerable and unpinned packages, skip the rest">

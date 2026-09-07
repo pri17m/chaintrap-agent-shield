@@ -1,4 +1,4 @@
-import { isWritableEcosystem } from "../scanners/ecosystems";
+import { skipReasonForFinding } from "./ecoManifest";
 import type { Finding } from "../types";
 import { implicitSameMajorRange, isUnpinnableSpec, parseSemver } from "../scanners/pinSpec";
 import {
@@ -55,8 +55,9 @@ export function shouldSkipFinding(f: Finding): string | undefined {
   if (!f.packageName) {
     return "no package name";
   }
-  if (!isWritableEcosystem(f.ecosystem)) {
-    return "Fix issues only edits npm/PyPI manifests";
+  const writeSkip = skipReasonForFinding(f);
+  if (writeSkip) {
+    return writeSkip;
   }
   if (isUnpinnableSpec(f.spec || "")) {
     return "git/file/URL spec cannot be pinned";
@@ -86,7 +87,7 @@ export function formatFixPreview(actions: FixAction[]): string {
   const deletes = actions.filter((a) => a.kind === "delete");
   const pins = actions.filter((a) => a.kind === "pin");
   const skips = actions.filter((a) => a.kind === "skip");
-  const head = `${deletes.length} delete (malicious), ${pins.length} pin/upgrade, ${skips.length} skip. Edits manifests only (no npm/npx/pip).`;
+  const head = `${deletes.length} delete (malicious), ${pins.length} pin/upgrade, ${skips.length} skip. Edits manifests only (no npm/npx/pip/cargo/go/mvn).`;
   const blocks: string[] = [head];
   const take = (title: string, list: FixAction[]) => {
     if (list.length === 0) {
