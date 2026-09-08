@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Chaintrap Agent Shield — Architecture",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "baseline-scan",
+        "label": "Baseline scan",
+        "focus": ["chaintrap_extension", "inventory_engine", "workspace_files", "osv_api"],
+        "note": "On activation (and on demand), Chaintrap inventories files, analyzes pins, and queries OSV."
+      },
+      {
+        "id": "fix-issues",
+        "label": "Fix issues",
+        "focus": ["fix_issues", "workspace_files"],
+        "note": "Plans safe edits, prompts for confirmation, then rewrites manifests (not hashed lockfiles)."
+      },
+      {
+        "id": "deep-extension-scan",
+        "label": "Deep extension scan (opt-in)",
+        "focus": ["chaintrap_extension", "chaintrap_api"],
+        "note": "When enabled and an API key exists, Chaintrap can request and poll a remote extension scan."
+      }
+    ],
+    "viewBox": [1240, 660]
+  },
+  "components": [
+    {
+      "id": "developer",
+      "type": "external",
+      "label": "Developer",
+      "sublabel": "Cursor / VS Code user",
+      "pos": [40, 324],
+      "size": [150, 64]
+    },
+    {
+      "id": "cursor_ui",
+      "type": "frontend",
+      "label": "Cursor / VS Code UI",
+      "sublabel": "Commands + Activity Bar",
+      "pos": [260, 320],
+      "size": [200, 72]
+    },
+    {
+      "id": "chaintrap_extension",
+      "type": "backend",
+      "label": "Chaintrap extension host",
+      "sublabel": "activate() + ShieldController",
+      "pos": [540, 317],
+      "size": [220, 78]
+    },
+    {
+      "id": "inventory_engine",
+      "type": "backend",
+      "label": "Inventory + analyzers",
+      "sublabel": "Parse ecosystems + classify pins",
+      "pos": [820, 312],
+      "size": [220, 88]
+    },
+    {
+      "id": "fix_issues",
+      "type": "backend",
+      "label": "Fix issues flow",
+      "sublabel": "Plan + apply safe edits",
+      "pos": [540, 140],
+      "size": [220, 88]
+    },
+    {
+      "id": "workspace_files",
+      "type": "database",
+      "label": "Workspace & config files",
+      "sublabel": "Manifests, lockfiles, mcp.json, skills/rules",
+      "pos": [820, 520],
+      "size": [220, 88]
+    },
+    {
+      "id": "chaintrap_api",
+      "type": "external",
+      "label": "Chaintrap scan API",
+      "sublabel": "scan.chaintrap.com (optional)",
+      "pos": [960, 60],
+      "size": [240, 72]
+    },
+    {
+      "id": "osv_api",
+      "type": "external",
+      "label": "OSV API",
+      "sublabel": "api.osv.dev (querybatch/vulns)",
+      "pos": [960, 430],
+      "size": [240, 72]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Developer workstation (Cursor / VS Code)",
+      "wraps": [
+        "cursor_ui",
+        "chaintrap_extension",
+        "inventory_engine",
+        "fix_issues",
+        "workspace_files"
+      ],
+      "pad": 24
+    },
+    {
+      "kind": "region",
+      "label": "Internet services",
+      "wraps": ["chaintrap_api", "osv_api"],
+      "pad": 24
+    }
+  ],
+  "connections": [
+    { "id": "dev-uses-ui", "from": "developer", "to": "cursor_ui", "label": "uses commands", "route": "straight", "fromSide": "right", "toSide": "left", "labelAt": [225, 410] },
+    { "id": "ui-invokes-extension", "from": "cursor_ui", "to": "chaintrap_extension", "label": "activate + commands", "variant": "emphasis", "route": "straight", "fromSide": "right", "toSide": "left", "labelAt": [500, 410] },
+    { "id": "extension-runs-inventory", "from": "chaintrap_extension", "to": "inventory_engine", "label": "baseline / delta scans", "variant": "emphasis", "route": "straight", "fromSide": "right", "toSide": "left", "labelAt": [900, 308] },
+    { "id": "inventory-reads-files", "from": "inventory_engine", "to": "workspace_files", "label": "walk + parse + diff", "labelAt": [840, 516] },
+    {
+      "id": "inventory-queries-osv",
+      "from": "inventory_engine",
+      "to": "osv_api",
+      "label": "querybatch / vulns",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "top",
+      "route": "auto",
+      "via": [[1060, 356], [1060, 410], [1080, 410]],
+      "labelAt": [1100, 394]
+    },
+    { "id": "extension-invokes-fix", "from": "chaintrap_extension", "to": "fix_issues", "label": "Fix issues", "variant": "emphasis", "labelAt": [460, 200] },
+    {
+      "id": "fix-writes-files",
+      "from": "fix_issues",
+      "to": "workspace_files",
+      "label": "writes manifests / mcp.json",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "auto",
+      "via": [[650, 240], [20, 240], [20, 420], [900, 420], [900, 500], [930, 500]],
+      "labelAt": [1100, 622]
+    },
+    {
+      "id": "extension-deep-scan",
+      "from": "chaintrap_extension",
+      "to": "chaintrap_api",
+      "label": "deep extension scan (opt-in)",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "top",
+      "route": "auto",
+      "via": [[780, 356], [780, 40], [1080, 40]],
+      "labelAt": [980, 146]
+    }
+  ]
+}
+
