@@ -9,3 +9,14 @@ node_modules/
 *.db
 *.db-*
 .local/
+
+# Cursor / agent local state (keep out of public repos)
+.cursor/skills/
+.cursor/rules/
+.cursor/commands/
+.cursor/mcp.json
+.vscode/
+
+# Speckit / planning artifacts (prevent accidental public pushes)
+specs/
+.specify/
