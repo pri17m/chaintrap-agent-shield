@@ -14,11 +14,10 @@ scripts/**
 fixtures/**
 DOGFOOD.md
 docs/**
+# Keep README images in the published VSIX so Marketplace can render them
+!media/**
 media/screenshots/*.html
-media/screenshots/ack.png
-media/screenshots/activity.png
-media/screenshots/mcp.png
-media/screenshots/agent-activity-ack.png
+.code-review-graph/**
 .code-review-graph/**
 .gitnexus/**
 .specify/**
