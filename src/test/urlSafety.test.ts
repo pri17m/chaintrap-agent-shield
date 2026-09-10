@@ -32,6 +32,11 @@ suite("urlSafety", () => {
     assert.strictEqual(resolved, undefined);
   });
 
+  test("resolveExternalHttpUrl rejects cross-origin absolute URLs", () => {
+    const resolved = resolveExternalHttpUrl("https://evil.example/report", "https://scan.chaintrap.com");
+    assert.strictEqual(resolved, undefined);
+  });
+
   test("resolveExternalHttpUrl rejects embedded credentials", () => {
     const resolved = resolveExternalHttpUrl("https://user:pass@example.com/report", "https://scan.chaintrap.com");
     assert.strictEqual(resolved, undefined);

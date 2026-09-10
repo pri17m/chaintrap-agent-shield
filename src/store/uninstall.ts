@@ -92,11 +92,11 @@ function stripMcpServers(
     try {
       const cut = removeMcpServerEntry(next, id);
       if (!cut.removed) {
-        return { next: stringifyMcpConfig(doc), removed };
+        return { next: raw, removed: [] };
       }
       next = cut.next;
     } catch {
-      return { next: stringifyMcpConfig(doc), removed };
+      return { next: raw, removed: [] };
     }
   }
   try {

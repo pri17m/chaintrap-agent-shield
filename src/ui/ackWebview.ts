@@ -142,6 +142,20 @@ export async function promptFindingInPanel(
           void vscode.window.showWarningMessage("Chaintrap: advisory URL was invalid.");
           return;
         }
+        let host = "";
+        let proto = "";
+        try {
+          const u = new URL(safe);
+          host = u.hostname.toLowerCase();
+          proto = u.protocol;
+        } catch {
+          void vscode.window.showWarningMessage("Chaintrap: advisory URL was invalid.");
+          return;
+        }
+        if (proto !== "https:" || (host !== "osv.dev" && host !== "www.osv.dev")) {
+          void vscode.window.showWarningMessage("Chaintrap: advisory host is not allowlisted.");
+          return;
+        }
         await vscode.env.openExternal(vscode.Uri.parse(safe));
         return;
       }

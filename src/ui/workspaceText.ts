@@ -14,6 +14,9 @@ function allowedRoots(): string[] {
 
 function allowedExactUserConfigFiles(): string[] {
   // Only allow direct edits of user-level MCP config(s). Skills/rules are not written by this extension.
+  if (!vscode.workspace.isTrusted) {
+    return [];
+  }
   return userConfigPaths().mcp;
 }
 
@@ -41,6 +44,9 @@ export function readWorkspaceText(filePath: string): string {
 }
 
 export async function writeWorkspaceText(filePath: string, contents: string): Promise<void> {
+  if (!vscode.workspace.isTrusted) {
+    throw new Error("Refusing to modify files in an untrusted workspace. Trust this workspace to enable Fix issues / Pin / Uninstall.");
+  }
   assertSafeReadWriteTarget(filePath);
   const uri = vscode.Uri.file(filePath);
   const open = vscode.workspace.textDocuments.find((d) => sameFsPath(d.uri.fsPath, filePath));

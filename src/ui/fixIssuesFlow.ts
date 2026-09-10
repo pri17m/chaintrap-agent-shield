@@ -7,7 +7,8 @@ import { readWorkspaceText, writeWorkspaceText } from "./workspaceText";
 
 export function resolveFixPath(action: FixAction): string | undefined {
   if (action.finding.surface === "mcp") {
-    return action.finding.path;
+    // Fix issues only edits workspace-scoped configs, never user-level home configs.
+    return action.finding.workspaceRoot ? action.finding.path : undefined;
   }
   return resolveWritableManifestPath(action.finding);
 }
@@ -68,12 +69,33 @@ export async function applyFixActions(actions: FixAction[]): Promise<Finding[]> 
 }
 
 export async function runFixIssues(findings: Finding[], fetchImpl?: typeof fetch): Promise<Finding[] | undefined> {
+  if (!vscode.workspace.isTrusted) {
+    void vscode.window.showWarningMessage(
+      "Fix issues is disabled in untrusted workspaces. Trust this workspace to allow manifest edits.",
+      { modal: true },
+    );
+    return undefined;
+  }
   const actions = await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: "Planning Fix issues…" },
     async () => planFixActions(findings, fetchImpl),
   );
   const actionable = actions.filter((a) => a.kind !== "skip");
-  if (actionable.length === 0) {
+  const editable = actionable.filter((a) => Boolean(resolveFixPath(a)));
+  const previewActions = actions.map((a) => {
+    if (a.kind === "skip") {
+      return a;
+    }
+    if (resolveFixPath(a)) {
+      return a;
+    }
+    return {
+      ...a,
+      kind: "skip" as const,
+      label: `Skip ${a.label.replace(/^Pin\s+|^Delete\s+/i, "")}: not a workspace file (Fix issues only edits workspace manifests)`,
+    };
+  });
+  if (editable.length === 0) {
     const skips = actions.filter((a) => a.kind === "skip");
     void vscode.window.showInformationMessage(
       skips.length
@@ -85,7 +107,24 @@ export async function runFixIssues(findings: Finding[], fetchImpl?: typeof fetch
     );
     return undefined;
   }
-  const choice = await vscode.window.showWarningMessage(formatFixPreview(actions), { modal: true }, "Fix issues");
+  const byFile = new Map<string, number>();
+  for (const a of editable) {
+    const p = resolveFixPath(a);
+    if (!p) {
+      continue;
+    }
+    byFile.set(p, (byFile.get(p) || 0) + 1);
+  }
+  const fileLines = [...byFile.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .slice(0, 12)
+    .map(([p, n]) => `• ${p} (${n} change${n === 1 ? "" : "s"})`);
+  const fileFooter = byFile.size > 12 ? `…and ${byFile.size - 12} more file(s)` : "";
+  const fileBlock =
+    byFile.size > 0
+      ? `\n\nFiles to be edited:\n${fileLines.join("\n")}${fileFooter ? `\n${fileFooter}` : ""}`
+      : "\n\nNo editable workspace files were found.";
+  const choice = await vscode.window.showWarningMessage(formatFixPreview(previewActions) + fileBlock, { modal: true }, "Fix issues");
   if (choice !== "Fix issues") {
     return undefined;
   }

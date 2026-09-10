@@ -37,9 +37,15 @@ export function resolveExternalHttpUrl(rawUrl: string, apiBase: string): string 
   if (!raw) {
     return undefined;
   }
+  let base: URL;
+  try {
+    base = new URL(String(apiBase || "").trim());
+  } catch {
+    return undefined;
+  }
   let u: URL;
   try {
-    u = new URL(raw, apiBase);
+    u = new URL(raw, base);
   } catch {
     return undefined;
   }
@@ -47,6 +53,13 @@ export function resolveExternalHttpUrl(rawUrl: string, apiBase: string): string 
     return undefined;
   }
   if (u.username || u.password) {
+    return undefined;
+  }
+  // Only allow report URLs on the same origin as the API base.
+  if (u.protocol !== base.protocol || u.hostname !== base.hostname || u.port !== base.port) {
+    return undefined;
+  }
+  if (u.protocol === "http:" && !isLoopbackHost(u.hostname)) {
     return undefined;
   }
   return u.toString();

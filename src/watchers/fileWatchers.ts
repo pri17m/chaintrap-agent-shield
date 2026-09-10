@@ -4,8 +4,9 @@ import { homeWatchRoots } from "./homeWatchRoots";
 export type { HomeWatchRoot } from "./homeWatchRoots";
 export { homeWatchRoots };
 
-export function createWatchers(onChange: () => void): vscode.Disposable {
+export function createWatchers(onChange: () => void, opts?: { includeHome?: boolean }): vscode.Disposable {
   const watchers: vscode.FileSystemWatcher[] = [];
+  const includeHome = opts?.includeHome !== false;
   const globs = [
     "**/package.json",
     "**/package-lock.json",
@@ -73,12 +74,14 @@ export function createWatchers(onChange: () => void): vscode.Disposable {
     w.onDidDelete(onChange);
     watchers.push(w);
   }
-  for (const { dir, pattern } of homeWatchRoots()) {
-    const w = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(dir, pattern));
-    w.onDidChange(onChange);
-    w.onDidCreate(onChange);
-    w.onDidDelete(onChange);
-    watchers.push(w);
+  if (includeHome) {
+    for (const { dir, pattern } of homeWatchRoots()) {
+      const w = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(dir, pattern));
+      w.onDidChange(onChange);
+      w.onDidCreate(onChange);
+      w.onDidDelete(onChange);
+      watchers.push(w);
+    }
   }
   return vscode.Disposable.from(...watchers);
 }

@@ -1,6 +1,6 @@
 import { inferredFromMcpServer, parseMcpConfigJson } from "../scanners/mcpParser";
 import type { Finding } from "../types";
-import { pinPackageTokenInMcpServer } from "./mcpJsonEdit";
+import { findMcpServerSpan, pinPackageTokenInMcpServer } from "./mcpJsonEdit";
 import { stringifyMcpConfig } from "./uninstall";
 
 /** Exact version token we will write into mcp.json. Allows Go v-prefix. No dist-tags, ranges, or URLs. */
@@ -154,6 +154,14 @@ export function pinMcpServerById(
     return { next: raw, pinned: false };
   }
   const want = mcpId.trim();
+  try {
+    // Refuse edits when the raw file is ambiguous (e.g. duplicate keys).
+    if (!findMcpServerSpan(raw, want)) {
+      return { next: raw, pinned: false };
+    }
+  } catch {
+    return { next: raw, pinned: false };
+  }
   let pinned = false;
   let packageName: string | undefined;
   let ecosystem: string | undefined;
