@@ -210,23 +210,25 @@ export function buildPosture(findings: Finding[], summary: InventorySummary = EM
   const malicious = findings.filter(isMaliciousFinding).length;
   const vulnerable = findings.filter(isVulnerablePackageFinding).length;
   const unackedCrit = findings.filter((f) => !f.acknowledged && f.severity === "critical").length;
+  const denylistDown = findings.some((f) => f.surface === "extension" && f.id.endsWith(":extension:denylistUnavailable"));
   const lockfileNotes = lockfileCoverageFindings(findings);
   const unscannedNotes = unscannedCoverageFindings(findings);
   const notExactNotes = notExactCoverageFindings(findings);
   const uncheckedMcp = mcp.unchecked;
   const unpinned = mcp.unpinned;
   const unverified = unverifiedOnlineFindings(findings);
-  const gaps = actionableCoverageGapCount(findings);
+  const gaps = actionableCoverageGapCount(findings) + (denylistDown ? 1 : 0);
   const checked = packagesChecked(summary);
   const skillRuleCount = summary.skills + summary.rules;
 
-  const statusText = statusTextFor(summary, malicious, unackedCrit, attentionBadge, gaps, checked);
+  const statusText = statusTextFor(summary, malicious, unackedCrit, attentionBadge, denylistDown, gaps, checked);
   const statusTooltip = [
     `malicious ${malicious}`,
     `vulnerable ${vulnerable}`,
+    denylistDown ? "denylist unavailable" : undefined,
     `gaps ${gaps}`,
     `${checked} checked`,
-  ].join(" · ");
+  ].filter(Boolean).join(" · ");
 
   const inventoryEmpty = checked === 0 && skillRuleCount === 0 && lockfileNotes.length === 0 && unscannedNotes.length === 0;
   if (summary.scanning && findings.length === 0 && inventoryEmpty) {
@@ -374,6 +376,17 @@ export function buildPosture(findings: Finding[], summary: InventorySummary = EM
       command: { command: "chaintrap.rescanBaseline", title: "Rescan workspace" },
     });
   }
+  if (denylistDown) {
+    coverageRows.push({
+      id: "denylistUnavailable",
+      group: "coverage",
+      label: "Denylist unavailable (1)",
+      count: 1,
+      tooltip:
+        "The bundled known-bad denylist file could not be loaded. Known-bad malware pins may be missed; OSV checks still run.",
+      command: { command: "chaintrap.rescanBaseline", title: "Rescan workspace" },
+    });
+  }
   if (skillRuleCount > 0) {
     coverageRows.push({
       id: "skillsNotAnalyzed",
@@ -477,6 +490,7 @@ function statusTextFor(
   malicious: number,
   unackedCrit: number,
   attentionBadge: number,
+  denylistDown: boolean,
   gaps: number,
   checked: number,
 ): string {
@@ -491,6 +505,9 @@ function statusTextFor(
   }
   if (attentionBadge > 0) {
     return `Chaintrap: ${attentionBadge} high`;
+  }
+  if (denylistDown) {
+    return "Chaintrap: denylist unavailable";
   }
   if (gaps > 0) {
     return `Chaintrap: ${gaps} coverage gap${gaps === 1 ? "" : "s"}`;

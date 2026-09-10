@@ -184,6 +184,16 @@ export class ShieldController {
 
   private async publish(findings: Finding[], openRoots: readonly string[], promptAck: boolean): Promise<void> {
 
+    if (
+      findings.some((f) => f.surface === "extension" && f.id.endsWith(":extension:denylistUnavailable")) &&
+      !this.store.denylistWarned()
+    ) {
+      await this.store.recordDenylistWarned();
+      void vscode.window.showWarningMessage(
+        "Chaintrap: known-bad denylist could not be loaded. Malware pins on the denylist may be missed; OSV checks still run.",
+      );
+    }
+
     await this.store.setFindings(findings);
 
     const shown = this.displayFindings(findings, openRoots);
@@ -247,10 +257,8 @@ export class ShieldController {
     const next = this.store.getFindings().filter((f) => !findings.some((acted) => isSameActionTarget(f, acted)));
 
     const folders = roots || vscode.workspace.workspaceFolders || [];
-    const items = [
-      ...inventoryUserConfig(),
-      ...[...folders].map((folder) => inventoryWorkspaceRoot(folder.uri.fsPath)).flat(),
-    ];
+    const userItems = vscode.workspace.isTrusted ? inventoryUserConfig() : [];
+    const items = [...userItems, ...[...folders].map((folder) => inventoryWorkspaceRoot(folder.uri.fsPath)).flat()];
     this.lastSummary = this.withHistory(summarizeInventory(items, openRoots.length > 0));
 
     await this.publish(next, openRoots, false);
@@ -327,7 +335,7 @@ export class ShieldController {
 
       const baselines = this.store.getBaselines();
 
-      const userItems = inventoryUserConfig();
+      const userItems = vscode.workspace.isTrusted ? inventoryUserConfig() : [];
 
       const rootItems: InventoryItem[][] = roots.map((folder) => inventoryWorkspaceRoot(folder.uri.fsPath));
 
@@ -438,7 +446,7 @@ export class ShieldController {
 
       const deltaItems: InventoryItem[] = [];
 
-      const userItems = inventoryUserConfig();
+      const userItems = vscode.workspace.isTrusted ? inventoryUserConfig() : [];
 
       const userDiff = diffItems(baselines["__user_config__"], userItems);
 

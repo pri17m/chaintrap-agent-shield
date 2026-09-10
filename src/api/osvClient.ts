@@ -107,12 +107,29 @@ export async function queryOsvQuerybatch(
         }
         continue;
       }
-      const data = (await resp.json()) as { results?: Array<{ vulns?: OsvVuln[] }> };
-      const rawResults = data.results || [];
-      chunk.forEach((_, idx) => {
-        const vulns = (rawResults[idx]?.vulns || []).filter((v) => v && typeof v === "object");
+      const data = (await resp.json()) as { results?: unknown };
+      const rawResults = Array.isArray((data as { results?: unknown }).results)
+        ? ((data as { results: unknown[] }).results as unknown[])
+        : null;
+      if (!rawResults) {
+        ok = false;
+        for (let j = 0; j < chunk.length; j++) {
+          results.push([]);
+        }
+        continue;
+      }
+      if (rawResults.length !== chunk.length) {
+        ok = false;
+      }
+      for (let idx = 0; idx < chunk.length; idx++) {
+        const row = rawResults[idx] as { vulns?: unknown } | undefined;
+        const list =
+          row && typeof row === "object" && Array.isArray((row as { vulns?: unknown }).vulns)
+            ? ((row as { vulns: unknown[] }).vulns as unknown[])
+            : [];
+        const vulns = list.filter((v) => v && typeof v === "object") as OsvVuln[];
         results.push(vulns);
-      });
+      }
     } catch {
       ok = false;
       for (let j = 0; j < chunk.length; j++) {

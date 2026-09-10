@@ -4,6 +4,7 @@ import * as os from "os";
 import * as path from "path";
 import type { CoverageKind, Ecosystem, InventoryItem } from "../types";
 import { isExactVersionString, normalizePackageName } from "./ecosystems";
+import { safeExistingFilePath } from "../security/pathSafety";
 import {
   parseBunLockBody,
   parseCabalFreeze,
@@ -117,9 +118,15 @@ function sha256(s: string): string {
   return crypto.createHash("sha256").update(s).digest("hex");
 }
 
-function readText(p: string): string | null {
+function readText(p: string, workspaceRoot?: string): string | null {
+  const check = workspaceRoot
+    ? safeExistingFilePath(p, { allowedRoots: [workspaceRoot] })
+    : safeExistingFilePath(p, { allowedExactFiles: [p] });
+  if (!check.ok) {
+    return null;
+  }
   try {
-    return fs.readFileSync(p, "utf8");
+    return fs.readFileSync(check.resolved, "utf8");
   } catch {
     return null;
   }
@@ -193,7 +200,7 @@ function addPackage(
 }
 
 function parsePackageJson(filePath: string, workspaceRoot: string, items: InventoryItem[]): void {
-  const raw = readText(filePath);
+  const raw = readText(filePath, workspaceRoot);
   if (!raw) {
     return;
   }
@@ -263,7 +270,7 @@ function parseTextLock(
   ecosystem: Ecosystem,
   parser: (raw: string) => Array<{ name: string; version: string }>,
 ): boolean {
-  const raw = readText(filePath);
+  const raw = readText(filePath, workspaceRoot);
   if (!raw) {
     return false;
   }
@@ -275,13 +282,14 @@ function parseTextLock(
   }
 }
 
-function joinIfExists(dir: string, name: string): string | null {
+function joinIfExists(dir: string, name: string, workspaceRoot: string): string | null {
   const full = path.join(dir, name);
-  return fs.existsSync(full) ? full : null;
+  const check = safeExistingFilePath(full, { allowedRoots: [workspaceRoot] });
+  return check.ok ? check.resolved : null;
 }
 
 function parsePackageLock(filePath: string, workspaceRoot: string, items: InventoryItem[]): void {
-  const raw = readText(filePath);
+  const raw = readText(filePath, workspaceRoot);
   if (!raw) {
     return;
   }
@@ -293,7 +301,7 @@ function parsePackageLock(filePath: string, workspaceRoot: string, items: Invent
 }
 
 function parsePnpmLock(filePath: string, workspaceRoot: string, items: InventoryItem[]): void {
-  const raw = readText(filePath);
+  const raw = readText(filePath, workspaceRoot);
   if (!raw) {
     return;
   }
@@ -301,7 +309,7 @@ function parsePnpmLock(filePath: string, workspaceRoot: string, items: Inventory
 }
 
 function parseYarnLock(filePath: string, workspaceRoot: string, items: InventoryItem[]): void {
-  const raw = readText(filePath);
+  const raw = readText(filePath, workspaceRoot);
   if (!raw) {
     return;
   }
@@ -309,7 +317,7 @@ function parseYarnLock(filePath: string, workspaceRoot: string, items: Inventory
 }
 
 function parseTomlLock(filePath: string, workspaceRoot: string, items: InventoryItem[]): void {
-  const raw = readText(filePath);
+  const raw = readText(filePath, workspaceRoot);
   if (!raw) {
     return;
   }
@@ -317,7 +325,7 @@ function parseTomlLock(filePath: string, workspaceRoot: string, items: Inventory
 }
 
 function parsePipfileLock(filePath: string, workspaceRoot: string, items: InventoryItem[]): void {
-  const raw = readText(filePath);
+  const raw = readText(filePath, workspaceRoot);
   if (!raw) {
     return;
   }
@@ -329,7 +337,7 @@ function parsePipfileLock(filePath: string, workspaceRoot: string, items: Invent
 }
 
 function parseRequirements(filePath: string, workspaceRoot: string, items: InventoryItem[]): void {
-  const raw = readText(filePath);
+  const raw = readText(filePath, workspaceRoot);
   if (!raw) {
     return;
   }
@@ -351,7 +359,7 @@ function parseRequirements(filePath: string, workspaceRoot: string, items: Inven
 }
 
 function parseMcpFile(filePath: string, workspaceRoot: string | undefined, items: InventoryItem[]): void {
-  const raw = readText(filePath);
+  const raw = readText(filePath, workspaceRoot);
   if (!raw) {
     return;
   }
@@ -413,7 +421,7 @@ function parseTextFiles(
       });
       continue;
     }
-    const raw = readText(filePath);
+    const raw = readText(filePath, workspaceRoot);
     if (raw === null) {
       continue;
     }
@@ -476,10 +484,10 @@ function discoverPackageDirs(workspaceRoot: string): string[] {
 function inventoryPackageDir(dir: string, workspaceRoot: string, items: InventoryItem[]): void {
   const pkgJson = path.join(dir, "package.json");
   const npmLocks = [
-    joinIfExists(dir, "package-lock.json"),
-    joinIfExists(dir, "pnpm-lock.yaml"),
-    joinIfExists(dir, "yarn.lock"),
-    joinIfExists(dir, "bun.lock"),
+    joinIfExists(dir, "package-lock.json", workspaceRoot),
+    joinIfExists(dir, "pnpm-lock.yaml", workspaceRoot),
+    joinIfExists(dir, "yarn.lock", workspaceRoot),
+    joinIfExists(dir, "bun.lock", workspaceRoot),
   ].filter((p): p is string => Boolean(p));
   if (npmLocks.length) {
     for (const lockPath of npmLocks) {
@@ -494,20 +502,20 @@ function inventoryPackageDir(dir: string, workspaceRoot: string, items: Inventor
         parseTextLock(lockPath, workspaceRoot, items, "npm", parseBunLockBody);
       }
     }
-  } else if (fs.existsSync(pkgJson)) {
+  } else if (safeExistingFilePath(pkgJson, { allowedRoots: [workspaceRoot] }).ok) {
     parsePackageJson(pkgJson, workspaceRoot, items);
     addCoverageNote(items, workspaceRoot, pkgJson, "npm");
   }
 
   const pypiLocks = [
-    joinIfExists(dir, "uv.lock"),
-    joinIfExists(dir, "poetry.lock"),
-    joinIfExists(dir, "Pipfile.lock"),
-    joinIfExists(dir, "pdm.lock"),
-    joinIfExists(dir, "pylock.toml"),
+    joinIfExists(dir, "uv.lock", workspaceRoot),
+    joinIfExists(dir, "poetry.lock", workspaceRoot),
+    joinIfExists(dir, "Pipfile.lock", workspaceRoot),
+    joinIfExists(dir, "pdm.lock", workspaceRoot),
+    joinIfExists(dir, "pylock.toml", workspaceRoot),
   ].filter((p): p is string => Boolean(p));
-  const req = joinIfExists(dir, "requirements.txt");
-  const pyproject = joinIfExists(dir, "pyproject.toml");
+  const req = joinIfExists(dir, "requirements.txt", workspaceRoot);
+  const pyproject = joinIfExists(dir, "pyproject.toml", workspaceRoot);
   if (pypiLocks.length) {
     for (const lockPath of pypiLocks) {
       const base = path.basename(lockPath);
@@ -531,12 +539,13 @@ function inventoryPackageDir(dir: string, workspaceRoot: string, items: Inventor
   }
 
   const gradleLocks = [
-    joinIfExists(dir, "gradle.lockfile"),
-    joinIfExists(dir, "buildscript-gradle.lockfile"),
-    joinIfExists(dir, "verification-metadata.xml"),
+    joinIfExists(dir, "gradle.lockfile", workspaceRoot),
+    joinIfExists(dir, "buildscript-gradle.lockfile", workspaceRoot),
+    joinIfExists(dir, "verification-metadata.xml", workspaceRoot),
   ].filter((p): p is string => Boolean(p));
-  const pom = joinIfExists(dir, "pom.xml");
-  const gradleDsl = joinIfExists(dir, "build.gradle") || joinIfExists(dir, "build.gradle.kts");
+  const pom = joinIfExists(dir, "pom.xml", workspaceRoot);
+  const gradleDsl =
+    joinIfExists(dir, "build.gradle", workspaceRoot) || joinIfExists(dir, "build.gradle.kts", workspaceRoot);
   if (gradleLocks.length) {
     for (const lockPath of gradleLocks) {
       const parser = path.basename(lockPath) === "verification-metadata.xml" ? parseGradleVerificationMetadata : parseGradleLockfile;
@@ -549,8 +558,8 @@ function inventoryPackageDir(dir: string, workspaceRoot: string, items: Inventor
     addCoverageNote(items, workspaceRoot, gradleDsl, "maven", "unscanned");
   }
 
-  const goSum = joinIfExists(dir, "go.sum");
-  const goMod = joinIfExists(dir, "go.mod");
+  const goSum = joinIfExists(dir, "go.sum", workspaceRoot);
+  const goMod = joinIfExists(dir, "go.mod", workspaceRoot);
   if (goSum) {
     parseTextLock(goSum, workspaceRoot, items, "go", parseGoSum);
   } else if (goMod) {
@@ -558,8 +567,8 @@ function inventoryPackageDir(dir: string, workspaceRoot: string, items: Inventor
     addCoverageNote(items, workspaceRoot, goMod, "go");
   }
 
-  const cargoLock = joinIfExists(dir, "Cargo.lock");
-  const cargoToml = joinIfExists(dir, "Cargo.toml");
+  const cargoLock = joinIfExists(dir, "Cargo.lock", workspaceRoot);
+  const cargoToml = joinIfExists(dir, "Cargo.toml", workspaceRoot);
   if (cargoLock) {
     parseTextLock(cargoLock, workspaceRoot, items, "crates", parseCargoLock);
   } else if (cargoToml) {
@@ -567,8 +576,8 @@ function inventoryPackageDir(dir: string, workspaceRoot: string, items: Inventor
     addCoverageNote(items, workspaceRoot, cargoToml, "crates");
   }
 
-  const gemLock = joinIfExists(dir, "Gemfile.lock") || joinIfExists(dir, "gems.locked");
-  const gemfile = joinIfExists(dir, "Gemfile");
+  const gemLock = joinIfExists(dir, "Gemfile.lock", workspaceRoot) || joinIfExists(dir, "gems.locked", workspaceRoot);
+  const gemfile = joinIfExists(dir, "Gemfile", workspaceRoot);
   if (gemLock) {
     parseTextLock(gemLock, workspaceRoot, items, "rubygems", parseGemfileLock);
   } else if (gemfile) {
@@ -576,8 +585,8 @@ function inventoryPackageDir(dir: string, workspaceRoot: string, items: Inventor
     addCoverageNote(items, workspaceRoot, gemfile, "rubygems");
   }
 
-  const nugetLock = joinIfExists(dir, "packages.lock.json");
-  const packagesConfig = joinIfExists(dir, "packages.config");
+  const nugetLock = joinIfExists(dir, "packages.lock.json", workspaceRoot);
+  const packagesConfig = joinIfExists(dir, "packages.config", workspaceRoot);
   if (nugetLock) {
     parseTextLock(nugetLock, workspaceRoot, items, "nuget", parseNugetPackagesLock);
   } else if (packagesConfig) {
@@ -588,60 +597,64 @@ function inventoryPackageDir(dir: string, workspaceRoot: string, items: Inventor
     const entries = fs.readdirSync(dir);
     for (const name of entries) {
       if (name.endsWith(".deps.json")) {
-        parseTextLock(path.join(dir, name), workspaceRoot, items, "nuget", parseDepsJson);
+        const dep = path.join(dir, name);
+        if (safeExistingFilePath(dep, { allowedRoots: [workspaceRoot] }).ok) {
+          parseTextLock(dep, workspaceRoot, items, "nuget", parseDepsJson);
+        }
       }
     }
   } catch {
     /* ignore */
   }
 
-  const composerLock = joinIfExists(dir, "composer.lock");
-  const composerJson = joinIfExists(dir, "composer.json");
+  const composerLock = joinIfExists(dir, "composer.lock", workspaceRoot);
+  const composerJson = joinIfExists(dir, "composer.json", workspaceRoot);
   if (composerLock) {
     parseTextLock(composerLock, workspaceRoot, items, "packagist", parseComposerLock);
   } else if (composerJson) {
     addCoverageNote(items, workspaceRoot, composerJson, "packagist", "unscanned");
   }
 
-  const pubLock = joinIfExists(dir, "pubspec.lock");
-  const pubspec = joinIfExists(dir, "pubspec.yaml");
+  const pubLock = joinIfExists(dir, "pubspec.lock", workspaceRoot);
+  const pubspec = joinIfExists(dir, "pubspec.yaml", workspaceRoot);
   if (pubLock) {
     parseTextLock(pubLock, workspaceRoot, items, "pub", parsePubspecLock);
   } else if (pubspec) {
     addCoverageNote(items, workspaceRoot, pubspec, "pub", "unscanned");
   }
 
-  const mixLock = joinIfExists(dir, "mix.lock");
-  const mixExs = joinIfExists(dir, "mix.exs");
+  const mixLock = joinIfExists(dir, "mix.lock", workspaceRoot);
+  const mixExs = joinIfExists(dir, "mix.exs", workspaceRoot);
   if (mixLock) {
     parseTextLock(mixLock, workspaceRoot, items, "hex", parseMixLock);
   } else if (mixExs) {
     addCoverageNote(items, workspaceRoot, mixExs, "hex", "unscanned");
   }
 
-  const packageResolved = joinIfExists(dir, "Package.resolved");
-  const packageSwift = joinIfExists(dir, "Package.swift");
+  const packageResolved = joinIfExists(dir, "Package.resolved", workspaceRoot);
+  const packageSwift = joinIfExists(dir, "Package.swift", workspaceRoot);
   if (packageResolved) {
     parseTextLock(packageResolved, workspaceRoot, items, "swift", parsePackageResolved);
   } else if (packageSwift) {
     addCoverageNote(items, workspaceRoot, packageSwift, "swift", "unscanned");
   }
 
-  const cabalFreeze = joinIfExists(dir, "cabal.project.freeze");
-  const stackLock = joinIfExists(dir, "stack.yaml.lock");
+  const cabalFreeze = joinIfExists(dir, "cabal.project.freeze", workspaceRoot);
+  const stackLock = joinIfExists(dir, "stack.yaml.lock", workspaceRoot);
   if (cabalFreeze) {
     parseTextLock(cabalFreeze, workspaceRoot, items, "hackage", parseCabalFreeze);
   } else if (stackLock) {
     parseTextLock(stackLock, workspaceRoot, items, "hackage", parseStackYamlLock);
   }
 
-  const renv = joinIfExists(dir, "renv.lock");
+  const renv = joinIfExists(dir, "renv.lock", workspaceRoot);
   if (renv) {
     parseTextLock(renv, workspaceRoot, items, "cran", parseRenvLock);
   }
 
-  const conanLock = joinIfExists(dir, "conan.lock");
-  const conanfile = joinIfExists(dir, "conanfile.txt") || joinIfExists(dir, "conanfile.py");
+  const conanLock = joinIfExists(dir, "conan.lock", workspaceRoot);
+  const conanfile =
+    joinIfExists(dir, "conanfile.txt", workspaceRoot) || joinIfExists(dir, "conanfile.py", workspaceRoot);
   if (conanLock) {
     parseTextLock(conanLock, workspaceRoot, items, "conan", parseConanLock);
   } else if (conanfile) {
@@ -655,11 +668,11 @@ export function inventoryWorkspaceRoot(workspaceRoot: string): InventoryItem[] {
     inventoryPackageDir(dir, workspaceRoot, items);
   }
   const mcpWs = path.join(workspaceRoot, ".cursor", "mcp.json");
-  if (fs.existsSync(mcpWs)) {
+  if (safeExistingFilePath(mcpWs, { allowedRoots: [workspaceRoot] }).ok) {
     parseMcpFile(mcpWs, workspaceRoot, items);
   }
   const mcpVscode = path.join(workspaceRoot, ".vscode", "mcp.json");
-  if (fs.existsSync(mcpVscode)) {
+  if (safeExistingFilePath(mcpVscode, { allowedRoots: [workspaceRoot] }).ok) {
     parseMcpFile(mcpVscode, workspaceRoot, items);
   }
   const skillFiles: string[] = [];
@@ -673,7 +686,7 @@ export function inventoryWorkspaceRoot(workspaceRoot: string): InventoryItem[] {
   walkFiles(path.join(workspaceRoot, ".cursor", "rules"), (n) => n.endsWith(".mdc") || n.endsWith(".md"), ruleFiles);
   for (const extra of ["AGENTS.md", "CLAUDE.md", "MEMORY.md", "SOUL.md", ".cursorrules"]) {
     const p = path.join(workspaceRoot, extra);
-    if (fs.existsSync(p)) {
+    if (safeExistingFilePath(p, { allowedRoots: [workspaceRoot] }).ok) {
       ruleFiles.push(p);
     }
   }
@@ -681,7 +694,7 @@ export function inventoryWorkspaceRoot(workspaceRoot: string): InventoryItem[] {
     path.join(workspaceRoot, ".claude", "settings.json"),
     path.join(workspaceRoot, ".claude", "settings.local.json"),
   ]) {
-    if (fs.existsSync(settings)) {
+    if (safeExistingFilePath(settings, { allowedRoots: [workspaceRoot] }).ok) {
       ruleFiles.push(settings);
     }
   }
@@ -702,7 +715,7 @@ export function inventoryUserConfig(): InventoryItem[] {
   const items: InventoryItem[] = [];
   const cfg = userConfigPaths();
   for (const p of cfg.mcp) {
-    if (fs.existsSync(p)) {
+    if (safeExistingFilePath(p, { allowedExactFiles: [p] }).ok) {
       parseMcpFile(p, undefined, items);
     }
   }

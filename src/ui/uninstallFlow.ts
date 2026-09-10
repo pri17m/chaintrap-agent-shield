@@ -27,6 +27,13 @@ function findManifest(finding: Finding, fileName: string): string | undefined {
 }
 
 export async function uninstallMaliciousFinding(finding: Finding): Promise<boolean> {
+  if (!vscode.workspace.isTrusted) {
+    void vscode.window.showWarningMessage(
+      "Uninstall is disabled in untrusted workspaces. Trust this workspace to allow manifest edits.",
+      { modal: true },
+    );
+    return false;
+  }
   if (!isMaliciousFinding(finding) || !finding.packageName) {
     void vscode.window.showWarningMessage("Only malicious packages can be uninstalled from this view.");
     return false;
@@ -43,6 +50,16 @@ export async function uninstallMaliciousFinding(finding: Finding): Promise<boole
 
   try {
     if (finding.surface === "mcp") {
+      if (!finding.workspaceRoot) {
+        const ok = await vscode.window.showWarningMessage(
+          `This will edit your user-level MCP config (${finding.path}). Continue?`,
+          { modal: true },
+          "Edit user config",
+        );
+        if (ok !== "Edit user config") {
+          return false;
+        }
+      }
       const raw = readWorkspaceText(finding.path);
       const { next, removed } = finding.mcpId
         ? removeMcpServerById(raw, finding.mcpId)

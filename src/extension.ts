@@ -14,6 +14,8 @@ import { uninstallMaliciousFinding } from "./ui/uninstallFlow";
 import { ProblemsReporter } from "./ui/problems";
 import { createWatchers } from "./watchers/fileWatchers";
 import { normalizeApiBase, resolveExternalHttpUrl } from "./api/urlSafety";
+import { promptFindingInPanel } from "./ui/ackWebview";
+import { acknowledgeFindingWithPanel } from "./ui/ackCommand";
 
 export function activate(context: vscode.ExtensionContext): void {
   const store = new StateStore(context);
@@ -57,7 +59,7 @@ export function activate(context: vscode.ExtensionContext): void {
   })();
 
   void controller.runBaseline(folders());
-  const watchers = createWatchers(() => controller.scheduleDelta(folders()));
+  let watchers = createWatchers(() => controller.scheduleDelta(folders()), { includeHome: vscode.workspace.isTrusted });
 
   context.subscriptions.push(
     diagnostics,
@@ -66,6 +68,13 @@ export function activate(context: vscode.ExtensionContext): void {
     depView,
     mcpView,
     watchers,
+    vscode.workspace.onDidGrantWorkspaceTrust(() => {
+      // Start watching home config only after trust is granted.
+      watchers.dispose();
+      watchers = createWatchers(() => controller.scheduleDelta(folders()), { includeHome: true });
+      context.subscriptions.push(watchers);
+      void controller.runBaseline(folders());
+    }),
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
       void controller.runBaseline(folders());
     }),
@@ -98,8 +107,14 @@ export function activate(context: vscode.ExtensionContext): void {
         pending.map((f) => ({ label: `[${f.severity}] ${f.title}`, description: f.path, finding: f })),
       );
       if (picked) {
-        await store.acknowledge(picked.finding.id);
-        controller.refreshUi(folders());
+        const ok = await acknowledgeFindingWithPanel({
+          finding: picked.finding,
+          prompt: (f) => promptFindingInPanel(f, 1, 1),
+          acknowledge: (id) => store.acknowledge(id),
+        });
+        if (ok) {
+          controller.refreshUi(folders());
+        }
       }
     }),
     vscode.commands.registerCommand("chaintrap.setApiKey", async () => {

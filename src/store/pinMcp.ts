@@ -1,6 +1,6 @@
 import { inferredFromMcpServer, parseMcpConfigJson } from "../scanners/mcpParser";
 import type { Finding } from "../types";
-import { pinPackageTokenInMcpServer } from "./mcpJsonEdit";
+import { findMcpServerSpan, pinPackageTokenInMcpServer } from "./mcpJsonEdit";
 import { stringifyMcpConfig } from "./uninstall";
 
 /** Exact version token we will write into mcp.json. Allows Go v-prefix. No dist-tags, ranges, or URLs. */
@@ -147,8 +147,21 @@ export function pinMcpServerById(
   if (!isPinVersion(version)) {
     return { next: raw, pinned: false };
   }
-  const doc = JSON.parse(raw) as Record<string, unknown>;
+  let doc: Record<string, unknown>;
+  try {
+    doc = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return { next: raw, pinned: false };
+  }
   const want = mcpId.trim();
+  try {
+    // Refuse edits when the raw file is ambiguous (e.g. duplicate keys).
+    if (!findMcpServerSpan(raw, want)) {
+      return { next: raw, pinned: false };
+    }
+  } catch {
+    return { next: raw, pinned: false };
+  }
   let pinned = false;
   let packageName: string | undefined;
   let ecosystem: string | undefined;
@@ -212,15 +225,25 @@ export function pinMcpServerById(
   if (!pinned || !packageName) {
     return { next: raw, pinned: false, packageName, ecosystem };
   }
-  const surgical = pinPackageTokenInMcpServer(
-    raw,
-    want,
-    packageName,
-    version.trim(),
-    ecosystem === "pypi" ? pinPypiSpecToken : ecosystem === "go" ? pinGoSpecToken : ecosystem === "crates" ? pinCargoSpecToken : pinNpmSpecToken,
-  );
-  if (surgical.pinned) {
-    return { next: surgical.next, pinned: true, packageName, ecosystem };
+  try {
+    const surgical = pinPackageTokenInMcpServer(
+      raw,
+      want,
+      packageName,
+      version.trim(),
+      ecosystem === "pypi"
+        ? pinPypiSpecToken
+        : ecosystem === "go"
+          ? pinGoSpecToken
+          : ecosystem === "crates"
+            ? pinCargoSpecToken
+            : pinNpmSpecToken,
+    );
+    if (surgical.pinned) {
+      return { next: surgical.next, pinned: true, packageName, ecosystem };
+    }
+  } catch {
+    /* fall back to re-stringifying */
   }
   return { next: stringifyMcpConfig(doc), pinned: true, packageName, ecosystem };
 }

@@ -159,21 +159,47 @@ function topObjectBrace(raw: string): number {
 
 function serversObjectBrace(raw: string): number | undefined {
   const root = objectProps(raw, topObjectBrace(raw));
-  const mcpServers = root.find((p) => p.key === "mcpServers");
-  if (mcpServers) {
-    const b = skipTrivia(raw, raw.indexOf("{", mcpServers.from));
+  const mcpServersHits = root.filter((p) => p.key === "mcpServers");
+  if (mcpServersHits.length === 1) {
+    const mcpServers = mcpServersHits[0];
+    const colon = raw.indexOf(":", mcpServers.from);
+    if (colon < 0) {
+      return undefined;
+    }
+    const b = skipTrivia(raw, colon + 1);
     return raw[b] === "{" ? b : undefined;
   }
-  const mcp = root.find((p) => p.key === "mcp");
+  if (mcpServersHits.length > 1) {
+    return undefined; // ambiguous (duplicate keys)
+  }
+
+  const mcpHits = root.filter((p) => p.key === "mcp");
+  const mcp = mcpHits.length === 1 ? mcpHits[0] : undefined;
   if (!mcp) {
     return undefined;
   }
-  const inner = objectProps(raw, skipTrivia(raw, raw.indexOf("{", mcp.from)));
-  const servers = inner.find((p) => p.key === "servers");
+  const colon = raw.indexOf(":", mcp.from);
+  if (colon < 0) {
+    return undefined;
+  }
+  const mcpObj = skipTrivia(raw, colon + 1);
+  if (raw[mcpObj] !== "{") {
+    return undefined;
+  }
+  const inner = objectProps(raw, mcpObj);
+  const serversHits = inner.filter((p) => p.key === "servers");
+  const servers = serversHits.length === 1 ? serversHits[0] : undefined;
   if (!servers) {
     return undefined;
   }
-  const b = skipTrivia(raw, raw.indexOf("{", servers.from));
+  if (serversHits.length > 1) {
+    return undefined;
+  }
+  const serversColon = raw.indexOf(":", servers.from);
+  if (serversColon < 0) {
+    return undefined;
+  }
+  const b = skipTrivia(raw, serversColon + 1);
   return raw[b] === "{" ? b : undefined;
 }
 
@@ -183,11 +209,15 @@ export function findMcpServerSpan(raw: string, mcpId: string): { from: number; t
     return undefined;
   }
   const props = objectProps(raw, brace);
-  const hit = props.find((p) => p.key === mcpId);
-  if (!hit) {
+  const hits = props.filter((p) => p.key === mcpId);
+  if (hits.length !== 1) {
     return undefined;
   }
+  const hit = hits[0];
   const colon = raw.indexOf(":", hit.from);
+  if (colon < 0) {
+    return undefined;
+  }
   const valueFrom = skipTrivia(raw, colon + 1);
   return { from: hit.from, to: hit.to, valueFrom };
 }
@@ -270,6 +300,9 @@ export function removeMcpServerEntry(raw: string, mcpId: string): { next: string
     return { next: raw, removed: false };
   }
   const props = objectProps(raw, brace);
+  if (props.filter((p) => p.key === mcpId).length !== 1) {
+    return { next: raw, removed: false };
+  }
   const idx = props.findIndex((p) => p.key === mcpId);
   if (idx < 0) {
     return { next: raw, removed: false };

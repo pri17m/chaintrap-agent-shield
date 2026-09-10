@@ -22,6 +22,13 @@ export async function resolveLatestPinVersion(
 }
 
 export async function pinMcpFinding(finding: Finding): Promise<boolean> {
+  if (!vscode.workspace.isTrusted) {
+    void vscode.window.showWarningMessage(
+      "Pin is disabled in untrusted workspaces. Trust this workspace to allow config edits.",
+      { modal: true },
+    );
+    return false;
+  }
   if (!isUnpinnedMcpFinding(finding) || !finding.mcpId || !finding.packageName) {
     void vscode.window.showWarningMessage("Only unpinned MCP servers can be pinned from this view.");
     return false;
@@ -89,6 +96,16 @@ export async function pinMcpFinding(finding: Finding): Promise<boolean> {
   }
 
   try {
+    if (!finding.workspaceRoot) {
+      const ok = await vscode.window.showWarningMessage(
+        `This will edit your user-level MCP config (${finding.path}). Continue?`,
+        { modal: true },
+        "Edit user config",
+      );
+      if (ok !== "Edit user config") {
+        return false;
+      }
+    }
     const raw = readWorkspaceText(finding.path);
     const { next, pinned, packageName } = pinMcpServerById(raw, finding.mcpId, pin);
     if (!pinned) {

@@ -3,6 +3,7 @@ import { applyFixToText } from "../store/fixApply";
 import { formatFixPreview, planFixActions } from "../store/fixPlan";
 import { pickCleanVersion } from "../store/pickCleanVersion";
 import { pinPackageJsonDependency, pinRequirementVersion } from "../store/pinManifest";
+import { resolveFixPath } from "../store/fixPaths";
 import { implicitSameMajorRange, satisfiesRange } from "../scanners/pinSpec";
 import type { Finding } from "../types";
 
@@ -356,6 +357,25 @@ suite("plan and apply Fix issues", () => {
     assert.ok(actions.every((a) => a.kind === "skip"));
     const raw = mcpDogfood;
     assert.strictEqual(applyFixToText(actions[0], raw).ok, false);
+  });
+
+  test("Fix issues never edits user-level MCP config paths", () => {
+    const action = {
+      kind: "pin" as const,
+      finding: f({
+        id: "home-mcp",
+        surface: "mcp",
+        path: "/home/me/.cursor/mcp.json",
+        mcpId: "docs",
+        packageName: "chrome-devtools-mcp",
+        ecosystem: "npm",
+        version: "unknown",
+        // workspaceRoot intentionally omitted => user-level config
+      }),
+      version: "0.4.1",
+      label: "pin",
+    };
+    assert.strictEqual(resolveFixPath(action), undefined);
   });
 
   test("package.json and requirements writers", () => {

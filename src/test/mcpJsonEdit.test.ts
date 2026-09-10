@@ -90,6 +90,30 @@ suite("mcp.json surgical edit", () => {
     assert.match(next, /"remote-example": \{[\s\S]*\}\s*\n  \}\s*\n\}/);
   });
 
+  test("refuses to pin when server id is ambiguous (duplicate keys)", () => {
+    const raw = `{
+  "mcpServers": {
+    "good": { "command": "npx", "args": ["-y", "safe-pkg@1.0.0"] },
+    "good": { "command": "npx", "args": ["-y", "evil-pkg@9.9.9"] }
+  }
+}
+`;
+    const { pinned } = pinMcpServerById(raw, "good", "1.2.3");
+    assert.strictEqual(pinned, false);
+  });
+
+  test("refuses to delete when server id is ambiguous (duplicate keys)", () => {
+    const raw = `{
+  "mcpServers": {
+    "good": { "command": "npx", "args": ["-y", "safe-pkg@1.0.0"] },
+    "good": { "command": "npx", "args": ["-y", "evil-pkg@9.9.9"] }
+  }
+}
+`;
+    const { removed } = removeMcpServerById(raw, "good");
+    assert.deepStrictEqual(removed, []);
+  });
+
   test("package.json uninstall keeps the file's indent", () => {
     const raw = `{
     "dependencies": {
