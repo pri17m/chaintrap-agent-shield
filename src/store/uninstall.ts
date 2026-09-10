@@ -22,7 +22,12 @@ export function stripRequirementsLine(raw: string, packageName: string): string 
 }
 
 export function removePackageJsonDependency(raw: string, packageName: string): string {
-  const doc = JSON.parse(raw) as Record<string, unknown>;
+  let doc: Record<string, unknown>;
+  try {
+    doc = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return raw;
+  }
   const sections = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"];
   for (const key of sections) {
     const block = doc[key];
@@ -49,7 +54,12 @@ function stripMcpServers(
   raw: string,
   drop: (id: string, inferredName: string | undefined) => boolean,
 ): { next: string; removed: string[] } {
-  const doc = JSON.parse(raw) as Record<string, unknown>;
+  let doc: Record<string, unknown>;
+  try {
+    doc = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return { next: raw, removed: [] };
+  }
   const removed: string[] = [];
   const stripMap = (servers: Record<string, unknown>): Record<string, unknown> => {
     const next: Record<string, unknown> = {};
@@ -79,11 +89,15 @@ function stripMcpServers(
   }
   let next = raw;
   for (const id of removed) {
-    const cut = removeMcpServerEntry(next, id);
-    if (!cut.removed) {
+    try {
+      const cut = removeMcpServerEntry(next, id);
+      if (!cut.removed) {
+        return { next: stringifyMcpConfig(doc), removed };
+      }
+      next = cut.next;
+    } catch {
       return { next: stringifyMcpConfig(doc), removed };
     }
-    next = cut.next;
   }
   try {
     JSON.parse(next);

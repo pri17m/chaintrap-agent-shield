@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import type { Finding } from "../types";
 import { ackViewModel, type AckViewModel } from "./ackViewModel";
+import { normalizeExternalHttpUrl } from "../api/urlSafety";
 
 export type AckPanelResult = "ack" | "dismiss";
 
@@ -136,7 +137,12 @@ export async function promptFindingInPanel(
         return;
       }
       if (msg.type === "advisory" && finding.advisoryUrl) {
-        await vscode.env.openExternal(vscode.Uri.parse(finding.advisoryUrl));
+        const safe = normalizeExternalHttpUrl(finding.advisoryUrl);
+        if (!safe) {
+          void vscode.window.showWarningMessage("Chaintrap: advisory URL was invalid.");
+          return;
+        }
+        await vscode.env.openExternal(vscode.Uri.parse(safe));
         return;
       }
       if (msg.type === "ack") {

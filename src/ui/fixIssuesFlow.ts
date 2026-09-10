@@ -13,7 +13,7 @@ export function resolveFixPath(action: FixAction): string | undefined {
 }
 
 export async function applyFixActions(actions: FixAction[]): Promise<Finding[]> {
-  const texts = new Map<string, string>();
+  const pendingByFile = new Map<string, { nextText: string; applied: Finding[] }>();
   const succeeded: Finding[] = [];
   for (const action of actions) {
     if (action.kind === "skip") {
@@ -23,8 +23,21 @@ export async function applyFixActions(actions: FixAction[]): Promise<Finding[]> 
     if (!filePath) {
       continue;
     }
-    const raw = texts.has(filePath) ? texts.get(filePath)! : readWorkspaceText(filePath);
-    const { next, ok } = applyFixToText(action, raw, filePath);
+    let raw: string;
+    try {
+      raw = pendingByFile.has(filePath) ? pendingByFile.get(filePath)!.nextText : readWorkspaceText(filePath);
+    } catch {
+      continue;
+    }
+    let next: string;
+    let ok: boolean;
+    try {
+      const step = applyFixToText(action, raw, filePath);
+      next = step.next;
+      ok = step.ok;
+    } catch {
+      continue;
+    }
     if (!ok) {
       continue;
     }
@@ -35,11 +48,21 @@ export async function applyFixActions(actions: FixAction[]): Promise<Finding[]> 
         continue;
       }
     }
-    texts.set(filePath, next);
-    succeeded.push(action.finding);
+    const prev = pendingByFile.get(filePath);
+    if (prev) {
+      prev.nextText = next;
+      prev.applied.push(action.finding);
+    } else {
+      pendingByFile.set(filePath, { nextText: next, applied: [action.finding] });
+    }
   }
-  for (const [filePath, contents] of texts) {
-    await writeWorkspaceText(filePath, contents);
+  for (const [filePath, { nextText, applied }] of pendingByFile) {
+    try {
+      await writeWorkspaceText(filePath, nextText);
+      succeeded.push(...applied);
+    } catch {
+      /* skip unsafe/failed writes */
+    }
   }
   return succeeded;
 }

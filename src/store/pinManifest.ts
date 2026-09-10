@@ -19,7 +19,12 @@ export function pinPackageJsonDependency(raw: string, packageName: string, versi
     JSON.parse(next);
     return { next, changed: true };
   } catch {
-    const doc = JSON.parse(raw) as Record<string, unknown>;
+    let doc: Record<string, unknown>;
+    try {
+      doc = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return { next: raw, changed: false };
+    }
     for (const key of PKG_SECTIONS) {
       const block = doc[key];
       if (block && typeof block === "object" && !Array.isArray(block) && packageName in (block as object)) {

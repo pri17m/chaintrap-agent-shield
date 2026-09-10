@@ -1,5 +1,5 @@
 import * as assert from "assert";
-import { normalizeApiBase, resolveExternalHttpUrl } from "../api/urlSafety";
+import { normalizeApiBase, normalizeExternalHttpUrl, resolveExternalHttpUrl } from "../api/urlSafety";
 
 suite("urlSafety", () => {
   test("normalizeApiBase allows https and strips trailing slash", () => {
@@ -30,6 +30,17 @@ suite("urlSafety", () => {
   test("resolveExternalHttpUrl rejects non-http(s) report URLs", () => {
     const resolved = resolveExternalHttpUrl("file:///etc/passwd", "https://scan.chaintrap.com");
     assert.strictEqual(resolved, undefined);
+  });
+
+  test("resolveExternalHttpUrl rejects embedded credentials", () => {
+    const resolved = resolveExternalHttpUrl("https://user:pass@example.com/report", "https://scan.chaintrap.com");
+    assert.strictEqual(resolved, undefined);
+  });
+
+  test("normalizeExternalHttpUrl only allows http(s) without credentials", () => {
+    assert.strictEqual(normalizeExternalHttpUrl("https://osv.dev/vulnerability/GHSA-xxxx"), "https://osv.dev/vulnerability/GHSA-xxxx");
+    assert.strictEqual(normalizeExternalHttpUrl("file:///etc/passwd"), undefined);
+    assert.strictEqual(normalizeExternalHttpUrl("https://u:p@example.com/"), undefined);
   });
 });
 

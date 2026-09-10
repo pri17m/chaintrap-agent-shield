@@ -147,7 +147,12 @@ export function pinMcpServerById(
   if (!isPinVersion(version)) {
     return { next: raw, pinned: false };
   }
-  const doc = JSON.parse(raw) as Record<string, unknown>;
+  let doc: Record<string, unknown>;
+  try {
+    doc = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return { next: raw, pinned: false };
+  }
   const want = mcpId.trim();
   let pinned = false;
   let packageName: string | undefined;
@@ -212,15 +217,25 @@ export function pinMcpServerById(
   if (!pinned || !packageName) {
     return { next: raw, pinned: false, packageName, ecosystem };
   }
-  const surgical = pinPackageTokenInMcpServer(
-    raw,
-    want,
-    packageName,
-    version.trim(),
-    ecosystem === "pypi" ? pinPypiSpecToken : ecosystem === "go" ? pinGoSpecToken : ecosystem === "crates" ? pinCargoSpecToken : pinNpmSpecToken,
-  );
-  if (surgical.pinned) {
-    return { next: surgical.next, pinned: true, packageName, ecosystem };
+  try {
+    const surgical = pinPackageTokenInMcpServer(
+      raw,
+      want,
+      packageName,
+      version.trim(),
+      ecosystem === "pypi"
+        ? pinPypiSpecToken
+        : ecosystem === "go"
+          ? pinGoSpecToken
+          : ecosystem === "crates"
+            ? pinCargoSpecToken
+            : pinNpmSpecToken,
+    );
+    if (surgical.pinned) {
+      return { next: surgical.next, pinned: true, packageName, ecosystem };
+    }
+  } catch {
+    /* fall back to re-stringifying */
   }
   return { next: stringifyMcpConfig(doc), pinned: true, packageName, ecosystem };
 }

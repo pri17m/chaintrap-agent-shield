@@ -46,5 +46,28 @@ export function resolveExternalHttpUrl(rawUrl: string, apiBase: string): string 
   if (u.protocol !== "https:" && u.protocol !== "http:") {
     return undefined;
   }
+  if (u.username || u.password) {
+    return undefined;
+  }
+  return u.toString();
+}
+
+export function normalizeExternalHttpUrl(rawUrl: string): string | undefined {
+  const raw = String(rawUrl || "").trim();
+  if (!raw) {
+    return undefined;
+  }
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return undefined;
+  }
+  if (u.protocol !== "https:" && u.protocol !== "http:") {
+    return undefined;
+  }
+  if (u.username || u.password) {
+    return undefined;
+  }
   return u.toString();
 }
