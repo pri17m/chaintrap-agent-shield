@@ -1,17 +1,9 @@
 import * as vscode from "vscode";
-import { resolveWritableManifestPath } from "../store/ecoManifest";
 import { applyFixToText } from "../store/fixApply";
+import { resolveFixPath } from "../store/fixPaths";
 import { formatFixPreview, planFixActions, type FixAction } from "../store/fixPlan";
 import type { Finding } from "../types";
 import { readWorkspaceText, writeWorkspaceText } from "./workspaceText";
-
-export function resolveFixPath(action: FixAction): string | undefined {
-  if (action.finding.surface === "mcp") {
-    // Fix issues only edits workspace-scoped configs, never user-level home configs.
-    return action.finding.workspaceRoot ? action.finding.path : undefined;
-  }
-  return resolveWritableManifestPath(action.finding);
-}
 
 export async function applyFixActions(actions: FixAction[]): Promise<Finding[]> {
   const pendingByFile = new Map<string, { nextText: string; applied: Finding[] }>();

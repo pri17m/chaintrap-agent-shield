@@ -93,24 +93,24 @@ suite("mcp.json surgical edit", () => {
   test("refuses to pin when server id is ambiguous (duplicate keys)", () => {
     const raw = `{
   "mcpServers": {
-    "docs": { "command": "npx", "args": ["-y", "chrome-devtools-mcp"] },
-    "docs": { "command": "npx", "args": ["-y", "chrome-devtools-mcp"] }
+    "good": { "command": "npx", "args": ["-y", "safe-pkg@1.0.0"] },
+    "good": { "command": "npx", "args": ["-y", "evil-pkg@9.9.9"] }
   }
 }
 `;
-    const { pinned } = pinMcpServerById(raw, "docs", "0.4.1");
+    const { pinned } = pinMcpServerById(raw, "good", "1.2.3");
     assert.strictEqual(pinned, false);
   });
 
   test("refuses to delete when server id is ambiguous (duplicate keys)", () => {
     const raw = `{
   "mcpServers": {
-    "docs": { "command": "npx", "args": ["-y", "chrome-devtools-mcp"] },
-    "docs": { "command": "npx", "args": ["-y", "chrome-devtools-mcp"] }
+    "good": { "command": "npx", "args": ["-y", "safe-pkg@1.0.0"] },
+    "good": { "command": "npx", "args": ["-y", "evil-pkg@9.9.9"] }
   }
 }
 `;
-    const { removed } = removeMcpServerById(raw, "docs");
+    const { removed } = removeMcpServerById(raw, "good");
     assert.deepStrictEqual(removed, []);
   });
 

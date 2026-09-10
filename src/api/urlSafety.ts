@@ -37,6 +37,10 @@ export function resolveExternalHttpUrl(rawUrl: string, apiBase: string): string 
   if (!raw) {
     return undefined;
   }
+  // Avoid protocol-relative confusion (`//host/...`) regardless of base.
+  if (/^\/\//.test(raw)) {
+    return undefined;
+  }
   let base: URL;
   try {
     base = new URL(String(apiBase || "").trim());

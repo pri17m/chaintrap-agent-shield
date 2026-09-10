@@ -32,8 +32,18 @@ suite("urlSafety", () => {
     assert.strictEqual(resolved, undefined);
   });
 
+  test("resolveExternalHttpUrl rejects protocol-relative URLs", () => {
+    const resolved = resolveExternalHttpUrl("//evil.example/phish", "https://scan.chaintrap.com");
+    assert.strictEqual(resolved, undefined);
+  });
+
   test("resolveExternalHttpUrl rejects cross-origin absolute URLs", () => {
     const resolved = resolveExternalHttpUrl("https://evil.example/report", "https://scan.chaintrap.com");
+    assert.strictEqual(resolved, undefined);
+  });
+
+  test("resolveExternalHttpUrl rejects cross-origin http URLs (e.g. link-local metadata)", () => {
+    const resolved = resolveExternalHttpUrl("http://169.254.169.254/", "https://scan.chaintrap.com");
     assert.strictEqual(resolved, undefined);
   });
 
