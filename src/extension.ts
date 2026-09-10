@@ -15,6 +15,7 @@ import { ProblemsReporter } from "./ui/problems";
 import { createWatchers } from "./watchers/fileWatchers";
 import { normalizeApiBase, resolveExternalHttpUrl } from "./api/urlSafety";
 import { promptFindingInPanel } from "./ui/ackWebview";
+import { acknowledgeFindingWithPanel } from "./ui/ackCommand";
 
 export function activate(context: vscode.ExtensionContext): void {
   const store = new StateStore(context);
@@ -106,9 +107,12 @@ export function activate(context: vscode.ExtensionContext): void {
         pending.map((f) => ({ label: `[${f.severity}] ${f.title}`, description: f.path, finding: f })),
       );
       if (picked) {
-        const result = await promptFindingInPanel(picked.finding, 1, 1);
-        if (result === "ack") {
-          await store.acknowledge(picked.finding.id);
+        const ok = await acknowledgeFindingWithPanel({
+          finding: picked.finding,
+          prompt: (f) => promptFindingInPanel(f, 1, 1),
+          acknowledge: (id) => store.acknowledge(id),
+        });
+        if (ok) {
           controller.refreshUi(folders());
         }
       }

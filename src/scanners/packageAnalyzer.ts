@@ -235,7 +235,7 @@ export async function analyzePackages(
     if (existing) {
       if (osvSummary) {
         const copy = packageFindingCopy({
-          malicious: true,
+          malicious: existing.malicious === true,
           eco: pkg.ecosystem,
           name: pkg.name,
           version: pkg.version,
