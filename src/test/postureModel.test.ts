@@ -290,4 +290,18 @@ suite("postureModel", () => {
     const model = buildPosture([], checkedSummary);
     assert.strictEqual(model.statusTooltip, "malicious 0 · vulnerable 0 · gaps 0 · 7 checked");
   });
+
+  test("denylist unavailable shows explicit status and a coverage row", () => {
+    const deny = finding({
+      id: "baseline:extension:denylistUnavailable",
+      surface: "extension",
+      severity: "info",
+      title: "Denylist unavailable",
+      message: "Known-bad denylist could not be loaded",
+    });
+    const model = buildPosture([deny], checkedSummary);
+    assert.strictEqual(model.statusText, "Chaintrap: denylist unavailable");
+    const coverage = model.groups.find((g) => g.kind === "coverage");
+    assert.ok(coverage?.rows.some((r) => r.id === "denylistUnavailable"));
+  });
 });

@@ -10,34 +10,53 @@ export interface KnownBadHit {
 
 interface KnownBadDoc {
   version?: number;
+  updated?: string;
   npm?: Record<string, string[]>;
   pypi?: Record<string, string[]>;
   references?: Record<string, { campaign?: string; note?: string; url?: string }>;
 }
 
 let cache: KnownBadDoc | null = null;
+let cachePath: string | null = null;
+let lastOk: boolean = true;
+let lastError: string | undefined;
 
 export function knownBadDataPath(): string {
   return path.join(__dirname, "..", "..", "data", "known_bad_packages.json");
 }
 
 export function loadKnownBad(dataPath?: string): KnownBadDoc {
-  if (cache) {
+  const p = dataPath || knownBadDataPath();
+  if (cache && cachePath === p) {
     return cache;
   }
-  const p = dataPath || knownBadDataPath();
   try {
     const raw = fs.readFileSync(p, "utf8");
     cache = JSON.parse(raw) as KnownBadDoc;
+    cachePath = p;
+    lastOk = true;
+    lastError = undefined;
     return cache;
-  } catch {
+  } catch (err) {
+    lastOk = false;
+    lastError = String(err);
     cache = { version: 1, npm: {}, pypi: {}, references: {} };
+    cachePath = p;
     return cache;
   }
 }
 
 export function clearKnownBadCache(): void {
   cache = null;
+  cachePath = null;
+  lastOk = true;
+  lastError = undefined;
+}
+
+export function knownBadHealth(dataPath?: string): { ok: boolean; path: string; updated?: string; error?: string } {
+  const doc = loadKnownBad(dataPath);
+  const p = dataPath || cachePath || knownBadDataPath();
+  return { ok: lastOk, path: p, updated: doc.updated, error: lastOk ? undefined : lastError || "load_failed" };
 }
 
 export function matchKnownBad(

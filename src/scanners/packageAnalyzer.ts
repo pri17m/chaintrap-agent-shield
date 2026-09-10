@@ -2,7 +2,7 @@ import type { Ecosystem, Finding, FindingSource, OsvQuery } from "../types";
 import { classifyOsvIds, fetchOsvSummaries, pickPrimaryOsvId, queryOsvQuerybatch } from "../api/osvClient";
 import { fetchLatestPackageVersion } from "../api/registryVersion";
 import { ecosystemLabel } from "./ecosystems";
-import { matchKnownBad } from "./knownBad";
+import { knownBadHealth, matchKnownBad } from "./knownBad";
 
 export interface PackageToAnalyze {
   ecosystem: Ecosystem;
@@ -100,6 +100,20 @@ export async function analyzePackages(
 ): Promise<Finding[]> {
   const findings: Finding[] = [];
   const now = new Date().toISOString();
+  const kb = knownBadHealth();
+  if (!kb.ok) {
+    findings.push({
+      id: `${source}:extension:denylistUnavailable`,
+      source,
+      surface: "extension",
+      severity: "info",
+      title: "Denylist unavailable",
+      message: `Known-bad denylist could not be loaded (${kb.error || "load_failed"}). Known-bad malware pins may be missed; OSV checks still run.`,
+      path: kb.path,
+      acknowledged: false,
+      createdAt: now,
+    });
+  }
   const needOsv: PackageToAnalyze[] = [];
   const pendingLatest: PackageToAnalyze[] = [];
 

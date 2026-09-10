@@ -184,6 +184,16 @@ export class ShieldController {
 
   private async publish(findings: Finding[], openRoots: readonly string[], promptAck: boolean): Promise<void> {
 
+    if (
+      findings.some((f) => f.surface === "extension" && f.id.endsWith(":extension:denylistUnavailable")) &&
+      !this.store.denylistWarned()
+    ) {
+      await this.store.recordDenylistWarned();
+      void vscode.window.showWarningMessage(
+        "Chaintrap: known-bad denylist could not be loaded. Malware pins on the denylist may be missed; OSV checks still run.",
+      );
+    }
+
     await this.store.setFindings(findings);
 
     const shown = this.displayFindings(findings, openRoots);

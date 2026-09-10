@@ -8,6 +8,7 @@ const ACK_KEY = "chaintrap.acks.v1";
 const SESSION_KEY = "chaintrap.sessionStartedAt";
 const LAST_FIX_KEY = "chaintrap.lastFixAt";
 const LAST_CLEARED_KEY = "chaintrap.lastClearedAt";
+const DENYLIST_WARNED_KEY = "chaintrap.denylistWarned.v1";
 
 export class StateStore {
   constructor(private readonly ctx: vscode.ExtensionContext) {}
@@ -58,6 +59,14 @@ export class StateStore {
 
   getLastClearedAt(): string | undefined {
     return this.ctx.workspaceState.get<string>(LAST_CLEARED_KEY);
+  }
+
+  denylistWarned(): boolean {
+    return Boolean(this.ctx.workspaceState.get<boolean>(DENYLIST_WARNED_KEY));
+  }
+
+  async recordDenylistWarned(): Promise<void> {
+    await this.ctx.workspaceState.update(DENYLIST_WARNED_KEY, true);
   }
 
   async recordFixApplied(): Promise<string> {
