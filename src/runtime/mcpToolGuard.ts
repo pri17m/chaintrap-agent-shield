@@ -23,24 +23,99 @@ export interface GuardResult {
   heuristic?: string;
 }
 
+/** Words that, shortly before a match, mean the text is describing/prohibiting the behavior ("never leak tokens"). */
+const NEGATION_RE = /\b(never|not|no|don'?t|doesn'?t|won'?t|cannot|can'?t|prevent|prevents|preventing|avoid|avoids|avoiding|without|stop|stops|protect|protects|protecting\s+against|against)\b[^.\n,;:!?]{0,30}$/i;
+
+interface Heuristic {
+  id: string;
+  label: string;
+  /** Global regex; every match is checked. */
+  re: RegExp;
+  /** When true, a match preceded by a negation word within the same clause is ignored. */
+  negatable?: boolean;
+}
+
 /**
  * Lightweight local patterns for tool-description poisoning / prompt injection.
  * Advisory only in v1 — never a hard block by themselves.
  */
-const TOOL_HEURISTICS: Array<{ id: string; re: RegExp; label: string }> = [
-  { id: "ignore-previous", re: /ignore\s+(all\s+)?(previous|prior|above)\s+(instructions|prompts|rules)/i, label: "ignore-previous-instructions" },
-  { id: "exfil", re: /\b(exfiltrat|send\s+(to|the)\s+(http|https|attacker)|upload\s+secrets|leak\s+(credentials|tokens|keys))\b/i, label: "exfil-language" },
-  { id: "hidden-instruction", re: /\b(you\s+must|always)\s+(call|invoke|run)\s+this\s+tool\b/i, label: "hidden-instruction" },
-  { id: "jailbreak", re: /\b(jailbreak|developer\s+mode|dan\s+mode|bypass\s+safety)\b/i, label: "jailbreak-language" },
-  { id: "base64-blob", re: /\b[A-Za-z0-9+/]{80,}={0,2}\b/, label: "long-base64-blob" },
+const TOOL_HEURISTICS: Heuristic[] = [
+  {
+    id: "ignore-previous",
+    label: "ignore-previous-instructions",
+    re: /\b(ignore|disregard)\s+(all\s+|the\s+|any\s+|your\s+)?(previous|prior|above|earlier)\s+(instructions|prompts|rules|directions)/gi,
+  },
+  {
+    id: "exfil",
+    label: "exfil-language",
+    re: /\b(exfiltrat\w*|send\s+(to|the)\s+(http|https|attacker)|upload\s+secrets|leak\s+(credentials|tokens|keys))\b/gi,
+    negatable: true,
+  },
+  {
+    id: "hidden-instruction",
+    label: "hidden-instruction",
+    // Deliberately narrow: "always call this tool" alone is common in benign docs. Flag only
+    // instructions that try to hijack tool ordering or hide behavior from the user.
+    re: /\b(before|prior\s+to)\s+(using|calling|invoking|running)\s+(any|every|all)\s+(other\s+)?tools?\b|\b(do\s+not|don'?t)\s+(tell|inform|mention\s+(this\s+)?to|alert)\s+the\s+user\b|\b(secretly|silently)\s+(call|invoke|run|send|read)\b/gi,
+  },
+  {
+    id: "jailbreak",
+    label: "jailbreak-language",
+    // "developer mode" alone is a common benign phrase; keep only unambiguous jailbreak terms.
+    re: /\b(jailbreak(?:ing|ed)?|dan\s+mode|bypass\s+(?:all\s+)?safety)\b/gi,
+    negatable: true,
+  },
 ];
+
+const BASE64_RUN_RE = /[A-Za-z0-9+/=]{80,}/g;
+
+/**
+ * Long base64-looking blob. Excludes file paths, URLs (slash-dense), hex digests, and
+ * low-entropy runs (e.g. repeated characters).
+ */
+function hasBase64Blob(text: string): boolean {
+  for (const m of text.matchAll(BASE64_RUN_RE)) {
+    const run = m[0];
+    // Slash-separated tokens: paths/URLs have a slash every ~10 chars; real base64 ~1 in 64.
+    const slashes = (run.match(/\//g) || []).length;
+    if (slashes > 0 && slashes / run.length > 0.03) {
+      continue;
+    }
+    if (/^[0-9a-fA-F]+$/.test(run)) {
+      continue;
+    }
+    if (!/[A-Z]/.test(run) || !/[a-z]/.test(run)) {
+      continue;
+    }
+    if (new Set(run).size < 12) {
+      continue;
+    }
+    return true;
+  }
+  return false;
+}
 
 function norm(s: string | undefined): string {
   return (s || "").trim().toLowerCase();
 }
 
+/** Package name for matching: lower-case, ecosystem prefix ("npm:") and trailing "@version" removed. */
+function normPkg(s: string | undefined): string {
+  let n = norm(s).replace(/^(npm|pypi|pip|uvx|npx|cargo|go|gem|nuget):/, "");
+  const at = n.lastIndexOf("@");
+  if (at > 0) {
+    n = n.slice(0, at);
+  }
+  return n;
+}
+
+/** Strip zero-width / BOM characters and apply NFKC so obfuscated phrases still match heuristics. */
+function normText(s: string): string {
+  return s.replace(/[\u200B-\u200F\u2060\u00AD\uFEFF]/g, "").normalize("NFKC");
+}
+
 function matchMcpFinding(findings: Finding[], payload: McpToolCallPayload): Finding | undefined {
-  const pkg = norm(payload.packageName);
+  const pkg = normPkg(payload.packageName);
   const sid = norm(payload.serverId);
   if (!pkg && !sid) {
     return undefined;
@@ -49,7 +124,7 @@ function matchMcpFinding(findings: Finding[], payload: McpToolCallPayload): Find
     if (f.surface !== "mcp") {
       return false;
     }
-    if (pkg && f.packageName && norm(f.packageName) === pkg) {
+    if (pkg && f.packageName && normPkg(f.packageName) === pkg) {
       return true;
     }
     if (sid && f.mcpId && norm(f.mcpId) === sid) {
@@ -60,14 +135,23 @@ function matchMcpFinding(findings: Finding[], payload: McpToolCallPayload): Find
 }
 
 function heuristicHit(payload: McpToolCallPayload): { id: string; label: string } | undefined {
-  const text = `${payload.toolName || ""}\n${payload.toolDescription || ""}\n${payload.argumentsPreview || ""}`;
+  const text = normText(`${payload.toolName || ""}\n${payload.toolDescription || ""}\n${payload.argumentsPreview || ""}`);
   if (!text.trim()) {
     return undefined;
   }
   for (const h of TOOL_HEURISTICS) {
-    if (h.re.test(text)) {
+    for (const m of text.matchAll(h.re)) {
+      if (h.negatable) {
+        const before = text.slice(Math.max(0, (m.index ?? 0) - 60), m.index ?? 0);
+        if (NEGATION_RE.test(before)) {
+          continue;
+        }
+      }
       return { id: h.id, label: h.label };
     }
+  }
+  if (hasBase64Blob(text)) {
+    return { id: "base64-blob", label: "long-base64-blob" };
   }
   return undefined;
 }
