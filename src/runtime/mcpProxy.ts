@@ -25,15 +25,21 @@ export interface ProxyHandle {
   close(): void;
 }
 
-function loadFindings(path: string | undefined): Finding[] {
+/** Load exported findings. Fails open (returns []) but reports why on stderr via `onError`. */
+export function loadFindings(path: string | undefined, onError?: (msg: string) => void): Finding[] {
   if (!path) {
     return [];
   }
   try {
     const raw = readFileSync(path, "utf8");
     const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed) ? (parsed as Finding[]) : [];
-  } catch {
+    if (!Array.isArray(parsed)) {
+      onError?.(`findings file is not a JSON array: ${path}`);
+      return [];
+    }
+    return parsed as Finding[];
+  } catch (e) {
+    onError?.(`could not load findings (${path}): ${e instanceof Error ? e.message : String(e)} — guard is failing open`);
     return [];
   }
 }
@@ -54,36 +60,83 @@ export function payloadFromRpc(msg: Record<string, unknown>, opts: Pick<ProxyOpt
   };
 }
 
+function blockResponse(id: unknown, reason: string): Record<string, unknown> {
+  return { jsonrpc: "2.0", id: id ?? null, error: { code: -32000, message: `Chaintrap blocked MCP tool call: ${reason}` } };
+}
+
+export interface ClientLineDecision {
+  forward: boolean;
+  response?: string;
+  /** Most relevant guard result (first block, else first warn, else first result). */
+  result?: GuardResult;
+  /** All guard results for the line (one per tools/call; several for a JSON-RPC batch). */
+  results?: GuardResult[];
+}
+
 /** Decide whether a single client line should be forwarded or replaced with a JSON-RPC error. */
 export function evaluateClientLine(
   line: string,
   findings: Finding[],
   opts: Pick<ProxyOptions, "serverId" | "packageName">,
-): { forward: boolean; response?: string; result?: GuardResult } {
+): ClientLineDecision {
   const trimmed = line.trim();
   if (!trimmed) {
     return { forward: true };
   }
-  let msg: Record<string, unknown>;
+  let parsed: unknown;
   try {
-    msg = JSON.parse(trimmed) as Record<string, unknown>;
+    parsed = JSON.parse(trimmed);
   } catch {
     return { forward: true };
   }
-  if (msg.method !== "tools/call") {
+
+  // JSON-RPC batch: evaluate every element; if any tools/call is blocked, reject the whole batch
+  // (nothing is forwarded) with an error response for each request that carried an id.
+  if (Array.isArray(parsed)) {
+    const results: GuardResult[] = [];
+    let blocked: GuardResult | undefined;
+    for (const el of parsed) {
+      if (!isObject(el) || el.method !== "tools/call") {
+        continue;
+      }
+      const r = evaluateMcpToolCall(findings, payloadFromRpc(el, opts));
+      results.push(r);
+      if (r.decision === "block" && !blocked) {
+        blocked = r;
+      }
+    }
+    const pick = blocked ?? results.find((r) => r.decision === "warn") ?? results[0];
+    if (!blocked) {
+      return { forward: true, result: pick, results };
+    }
+    const errors: Array<Record<string, unknown>> = [];
+    for (const el of parsed) {
+      if (!isObject(el) || !("id" in el) || el.id === undefined) {
+        continue; // notifications get no response
+      }
+      if (el.method === "tools/call") {
+        const r = evaluateMcpToolCall(findings, payloadFromRpc(el, opts));
+        errors.push(blockResponse(el.id, r.decision === "block" ? r.reason : `batch rejected because another call was blocked (${blocked.reason})`));
+      } else {
+        errors.push(blockResponse(el.id, `batch rejected because a tools/call in it was blocked (${blocked.reason})`));
+      }
+    }
+    return { forward: false, response: errors.length ? JSON.stringify(errors) : undefined, result: blocked, results };
+  }
+
+  if (!isObject(parsed) || parsed.method !== "tools/call") {
     return { forward: true };
   }
+  const msg = parsed;
   const result = evaluateMcpToolCall(findings, payloadFromRpc(msg, opts));
   if (result.decision !== "block") {
-    return { forward: true, result };
+    return { forward: true, result, results: [result] };
   }
-  const id = msg.id ?? null;
-  const response = JSON.stringify({
-    jsonrpc: "2.0",
-    id,
-    error: { code: -32000, message: `Chaintrap blocked MCP tool call: ${result.reason}` },
-  });
-  return { forward: false, response, result };
+  return { forward: false, response: JSON.stringify(blockResponse(msg.id, result.reason)), result, results: [result] };
+}
+
+function isObject(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
 }
 
 /**
@@ -100,17 +153,37 @@ export function startStdioProxy(options: ProxyOptions): ProxyHandle {
   const rl = createInterface({ input: process.stdin });
   rl.on("line", (line) => {
     const decided = evaluateClientLine(line, findings, options);
-    if (!decided.forward && decided.response) {
-      process.stdout.write(decided.response + "\n");
-      if (options.logWarnings !== false) {
+    const log = options.logWarnings !== false;
+    if (!decided.forward) {
+      // A blocked batch made of notifications only has nothing to answer, but is still never forwarded.
+      if (decided.response) {
+        process.stdout.write(decided.response + "\n");
+      }
+      if (log) {
         process.stderr.write(`[chaintrap-proxy] block ${decided.result?.reason || ""}\n`);
       }
       return;
     }
-    if (decided.result?.decision === "warn" && options.logWarnings !== false) {
-      process.stderr.write(`[chaintrap-proxy] warn ${decided.result.reason}\n`);
+    if (log) {
+      for (const r of decided.results ?? (decided.result ? [decided.result] : [])) {
+        if (r.decision === "warn") {
+          process.stderr.write(`[chaintrap-proxy] warn ${r.reason}\n`);
+        }
+      }
     }
     child.stdin.write(line + "\n");
+  });
+
+  // Client closed stdin: let the child finish its input and exit instead of lingering.
+  rl.on("close", () => {
+    child.stdin.end();
+  });
+  child.on("error", (e) => {
+    process.stderr.write(`[chaintrap-proxy] failed to start server: ${e.message}\n`);
+    process.exit(1);
+  });
+  child.on("close", (code) => {
+    process.exit(code ?? 0);
   });
 
   child.stdout.on("data", (d: Buffer) => {
@@ -140,7 +213,7 @@ export function runProxyFromArgv(argv: string[]): void {
     process.stderr.write("usage: chaintrap-mcp-proxy <command> [args...]\n");
     process.exit(2);
   }
-  const findings = loadFindings(process.env.CHAINTRAP_FINDINGS_PATH);
+  const findings = loadFindings(process.env.CHAINTRAP_FINDINGS_PATH, (m) => process.stderr.write(`[chaintrap-proxy] ${m}\n`));
   startStdioProxy({
     command,
     args: argv.slice(1),

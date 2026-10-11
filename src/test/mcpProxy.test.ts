@@ -1,6 +1,10 @@
 import * as assert from "assert";
 
-import { evaluateClientLine, payloadFromRpc } from "../runtime/mcpProxy";
+import { evaluateClientLine, loadFindings, payloadFromRpc } from "../runtime/mcpProxy";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { writeFindingsExport } from "../runtime/findingsExport";
 import type { Finding } from "../types";
 
 function malicious(): Finding {
@@ -61,5 +65,60 @@ suite("mcpProxy", () => {
     });
     const decided = evaluateClientLine(line, [], { packageName: "safe" });
     assert.strictEqual(decided.forward, true);
+  });
+
+  test("valid JSON that is not an object (null) fails open instead of throwing", () => {
+    for (const line of ["null", "123", '"s"', "true", "[1]"]) {
+      const decided = evaluateClientLine(line, [malicious()], { packageName: "evil-mcp" });
+      assert.strictEqual(decided.forward, true);
+    }
+  });
+
+  suite("JSON-RPC batch", () => {
+    const call = (id: number | undefined, name = "x") => ({ jsonrpc: "2.0", ...(id === undefined ? {} : { id }), method: "tools/call", params: { name } });
+    const opts = { packageName: "evil-mcp" };
+    test("blocks whole batch when any tools/call is blocked and answers each request", () => {
+      const d = evaluateClientLine(JSON.stringify([{ jsonrpc: "2.0", id: 1, method: "tools/list" }, call(2), call(undefined)]), [malicious()], opts);
+      assert.strictEqual(d.forward, false);
+      const errs = JSON.parse(d.response as string) as Array<{ id: number; error: { code: number } }>;
+      assert.deepStrictEqual(errs.map((e) => e.id), [1, 2]);
+      assert.ok(errs.every((e) => e.error.code === -32000));
+    });
+    test("blocked batch of only notifications is not forwarded and has no response", () => {
+      const d = evaluateClientLine(JSON.stringify([call(undefined)]), [malicious()], opts);
+      assert.strictEqual(d.forward, false);
+      assert.strictEqual(d.response, undefined);
+    });
+    test("batch with no blocked call is forwarded", () => {
+      const d = evaluateClientLine(JSON.stringify([call(1), call(2)]), [], opts);
+      assert.strictEqual(d.forward, true);
+      assert.strictEqual(d.results?.length, 2);
+    });
+    test("empty batch and batch of garbage are forwarded", () => {
+      assert.strictEqual(evaluateClientLine("[]", [malicious()], opts).forward, true);
+      assert.strictEqual(evaluateClientLine("[1,null,\"s\"]", [malicious()], opts).forward, true);
+    });
+  });
+
+  test("loadFindings fails open but reports why", () => {
+    const msgs: string[] = [];
+    assert.deepStrictEqual(loadFindings("/nonexistent/findings.json", (m) => msgs.push(m)), []);
+    const dir = mkdtempSync(join(tmpdir(), "ct-"));
+    writeFileSync(join(dir, "bad.json"), "{bad");
+    writeFileSync(join(dir, "obj.json"), "{}");
+    assert.deepStrictEqual(loadFindings(join(dir, "bad.json"), (m) => msgs.push(m)), []);
+    assert.deepStrictEqual(loadFindings(join(dir, "obj.json"), (m) => msgs.push(m)), []);
+    assert.strictEqual(msgs.length, 3);
+  });
+
+  test("writeFindingsExport writes and reports errors", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ct-"));
+    const ok = writeFindingsExport(join(dir, "sub", "findings.json"), [malicious()]);
+    assert.strictEqual(ok.ok, true);
+    assert.strictEqual(loadFindings(join(dir, "sub", "findings.json")).length, 1);
+    writeFileSync(join(dir, "file"), "x");
+    const bad = writeFindingsExport(join(dir, "file", "findings.json"), []);
+    assert.strictEqual(bad.ok, false);
+    assert.ok(bad.error);
   });
 });
