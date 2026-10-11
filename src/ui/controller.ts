@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
-import { writeFileSync, mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { writeFindingsExport } from "../runtime/findingsExport";
 
 import { analyzeItems } from "../scanners/itemAnalyzer";
 
@@ -181,13 +180,22 @@ export class ShieldController {
     if (!this.findingsExportPath) {
       return;
     }
-    try {
-      mkdirSync(dirname(this.findingsExportPath), { recursive: true });
-      writeFileSync(this.findingsExportPath, JSON.stringify(findings), "utf8");
-    } catch {
-      /* proxy export is best-effort */
+    const res = writeFindingsExport(this.findingsExportPath, findings);
+    if (res.ok) {
+      this.exportErrorShown = false;
+      return;
+    }
+    // Without a findings file the MCP proxy silently fails open, so tell the user (once per failure streak).
+    console.error(`[chaintrap] could not export findings for the MCP proxy: ${res.error}`);
+    if (!this.exportErrorShown) {
+      this.exportErrorShown = true;
+      void vscode.window.showWarningMessage(
+        `Chaintrap: could not write findings for the MCP proxy (${res.error}). The proxy will fail open until this is fixed.`,
+      );
     }
   }
+
+  private exportErrorShown = false;
 
   getFindingsExportPath(): string | undefined {
     return this.findingsExportPath;
