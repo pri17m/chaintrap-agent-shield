@@ -17,6 +17,7 @@ import { normalizeApiBase, resolveExternalHttpUrl } from "./api/urlSafety";
 import { promptFindingInPanel } from "./ui/ackWebview";
 import { acknowledgeFindingWithPanel } from "./ui/ackCommand";
 import { evaluateMcpToolCall, type McpToolCallPayload } from "./runtime/mcpToolGuard";
+import { join } from "node:path";
 
 export function activate(context: vscode.ExtensionContext): void {
   const store = new StateStore(context);
@@ -44,7 +45,8 @@ export function activate(context: vscode.ExtensionContext): void {
     treeDataProvider: mcpTree,
     showCollapseAll: true,
   });
-  const controller = new ShieldController(store, problems, [depTree, mcpTree], postureTree, status, [depView, mcpView], postureView);
+  const findingsExportPath = join(context.globalStorageUri.fsPath, "findings.json");
+  const controller = new ShieldController(store, problems, [depTree, mcpTree], postureTree, status, [depView, mcpView], postureView, findingsExportPath);
   const folders = () => vscode.workspace.workspaceFolders || [];
 
   void (async () => {
@@ -78,6 +80,26 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
       void controller.runBaseline(folders());
+    }),
+    vscode.commands.registerCommand("chaintrap.showMcpProxySnippet", async () => {
+      const proxyJs = join(context.extensionPath, "out", "runtime", "mcpProxyCli.js");
+      const snippet = [
+        "{",
+        '  "mcpServers": {',
+        '    "example": {',
+        '      "command": "node",',
+        `      "args": ["${proxyJs}", "npx", "-y", "@modelcontextprotocol/server-filesystem", "/tmp"],`,
+        '      "env": {',
+        `        "CHAINTRAP_FINDINGS_PATH": "${findingsExportPath}",`,
+        '        "CHAINTRAP_SERVER_ID": "example",',
+        '        "CHAINTRAP_PACKAGE_NAME": "@modelcontextprotocol/server-filesystem"',
+        "      }",
+        "    }",
+        "  }",
+        "}",
+      ].join("\n");
+      await vscode.env.clipboard.writeText(snippet);
+      void vscode.window.showInformationMessage("Chaintrap MCP proxy snippet copied. Point mcp.json at the proxy; it wraps the real server and applies the local guard.");
     }),
     vscode.commands.registerCommand("chaintrap.evaluateMcpToolCall", async (payload?: McpToolCallPayload) => {
       const findings = store.getFindings();

@@ -43,6 +43,10 @@
   "contributes": {
     "commands": [
       {
+        "command": "chaintrap.showMcpProxySnippet",
+        "title": "Chaintrap: Copy MCP proxy snippet"
+      },
+      {
         "command": "chaintrap.evaluateMcpToolCall",
         "title": "Chaintrap: Evaluate MCP tool call (local guard)"
       },

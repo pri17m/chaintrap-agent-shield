@@ -88,6 +88,14 @@ Malicious MCP servers are removed from that config by server id. Malicious npm a
 No API key is required for the workspace scan. The extension reads dependency and MCP files in open folders, does not execute workspace code, and does not upload source. It queries OSV with <b>package name + version only</b>. See <a href="PRIVACY.md"><b>PRIVACY.md</b></a>.
 </p>
 
+<h2 style="font-family: Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif; font-weight: 700;">MCP proxy</h2>
+
+<p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;">STDIO proxy that sits between the agent and a local MCP server. It reuses the local guard: <b>block</b> when the matched pin is malicious, <b>warn</b> on high/critical or tool-description heuristics, fail open otherwise. Findings are written to the extension global storage on each scan.</p>
+
+<pre style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;">node out/runtime/mcpProxyCli.js npx -y @modelcontextprotocol/server-filesystem /tmp</pre>
+
+<p style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;">Set <code>CHAINTRAP_FINDINGS_PATH</code>, <code>CHAINTRAP_SERVER_ID</code>, and <code>CHAINTRAP_PACKAGE_NAME</code>. Use <b>Chaintrap: Copy MCP proxy snippet</b> for a ready <code>mcp.json</code> block.</p>
+
 <h2 style="font-family: Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif; font-weight: 700;">Commands</h2>
 
 <table>
@@ -98,6 +106,10 @@ No API key is required for the workspace scan. The extension reads dependency an
 <tr>
 <td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;"><b>Chaintrap: Rescan workspace baseline</b></td>
 <td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;">Run the workspace inventory again</td>
+</tr>
+<tr>
+<td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;"><b>Chaintrap: Copy MCP proxy snippet</b></td>
+<td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;">Copy an <code>mcp.json</code> example that wraps a real STDIO MCP server with the Chaintrap proxy. The proxy uses exported findings and blocks malicious pins.</td>
 </tr>
 <tr>
 <td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;"><b>Chaintrap: Evaluate MCP tool call (local guard)</b></td>

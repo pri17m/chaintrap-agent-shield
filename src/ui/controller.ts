@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import { writeFileSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 
 import { analyzeItems } from "../scanners/itemAnalyzer";
 
@@ -81,21 +83,14 @@ export class ShieldController {
 
 
   constructor(
-
     private readonly store: StateStore,
-
     private readonly problems: ProblemsReporter,
-
     private readonly trees: AgentActivityProvider[],
-
     private readonly posture: PostureProvider,
-
     private readonly status: vscode.StatusBarItem,
-
     private readonly treeViews: vscode.TreeView<unknown>[] = [],
-
     private readonly postureView?: vscode.TreeView<unknown>,
-
+    private readonly findingsExportPath?: string,
   ) {}
 
 
@@ -182,8 +177,23 @@ export class ShieldController {
 
 
 
-  private async publish(findings: Finding[], openRoots: readonly string[], promptAck: boolean): Promise<void> {
+  private exportFindingsForProxy(findings: Finding[]): void {
+    if (!this.findingsExportPath) {
+      return;
+    }
+    try {
+      mkdirSync(dirname(this.findingsExportPath), { recursive: true });
+      writeFileSync(this.findingsExportPath, JSON.stringify(findings), "utf8");
+    } catch {
+      /* proxy export is best-effort */
+    }
+  }
 
+  getFindingsExportPath(): string | undefined {
+    return this.findingsExportPath;
+  }
+
+  private async publish(findings: Finding[], openRoots: readonly string[], promptAck: boolean): Promise<void> {
     if (
       findings.some((f) => f.surface === "extension" && f.id.endsWith(":extension:denylistUnavailable")) &&
       !this.store.denylistWarned()
@@ -195,6 +205,7 @@ export class ShieldController {
     }
 
     await this.store.setFindings(findings);
+    this.exportFindingsForProxy(findings);
 
     const shown = this.displayFindings(findings, openRoots);
 
