@@ -16,6 +16,7 @@ import { createWatchers } from "./watchers/fileWatchers";
 import { normalizeApiBase, resolveExternalHttpUrl } from "./api/urlSafety";
 import { promptFindingInPanel } from "./ui/ackWebview";
 import { acknowledgeFindingWithPanel } from "./ui/ackCommand";
+import { evaluateMcpToolCall, type McpToolCallPayload } from "./runtime/mcpToolGuard";
 
 export function activate(context: vscode.ExtensionContext): void {
   const store = new StateStore(context);
@@ -77,6 +78,16 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
       void controller.runBaseline(folders());
+    }),
+    vscode.commands.registerCommand("chaintrap.evaluateMcpToolCall", async (payload?: McpToolCallPayload) => {
+      const findings = store.getFindings();
+      const result = evaluateMcpToolCall(findings, payload);
+      if (result.decision === "block") {
+        void vscode.window.showErrorMessage(`Chaintrap blocked MCP tool call: ${result.reason}`);
+      } else if (result.decision === "warn") {
+        void vscode.window.showWarningMessage(`Chaintrap MCP warning: ${result.reason}`);
+      }
+      return result;
     }),
     vscode.commands.registerCommand("chaintrap.openFindingLocation", async (filePath: string) => {
       if (typeof filePath === "string" && filePath) {

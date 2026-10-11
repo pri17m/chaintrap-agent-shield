@@ -100,6 +100,10 @@ No API key is required for the workspace scan. The extension reads dependency an
 <td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;">Run the workspace inventory again</td>
 </tr>
 <tr>
+<td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;"><b>Chaintrap: Evaluate MCP tool call (local guard)</b></td>
+<td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;">Local offline check of one MCP tool call. Blocks when the matched pin is malicious; warns on high/critical vulnerable pins and on tool-description heuristics. Fail-open. Hooks can call <code>chaintrap.evaluateMcpToolCall</code>.</td>
+</tr>
+<tr>
 <td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;"><b>Fix issues</b></td>
 <td style="font-family: 'Trebuchet MS', 'Gill Sans', 'Segoe UI', sans-serif;">Tools icon on posture / Dependencies / MCP: delete malware, pin or upgrade the rest. Manifests only</td>
 </tr>

@@ -43,6 +43,10 @@
   "contributes": {
     "commands": [
       {
+        "command": "chaintrap.evaluateMcpToolCall",
+        "title": "Chaintrap: Evaluate MCP tool call (local guard)"
+      },
+      {
         "command": "chaintrap.rescanBaseline",
         "title": "Chaintrap: Rescan workspace baseline"
       },
