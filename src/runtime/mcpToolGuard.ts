@@ -156,6 +156,11 @@ function heuristicHit(payload: McpToolCallPayload): { id: string; label: string 
   return undefined;
 }
 
+/** Scan a tool's own name/description (e.g. from a tools/list response) with the guard heuristics. */
+export function scanToolDefinition(name: string | undefined, description: string | undefined): { id: string; label: string } | undefined {
+  return heuristicHit({ toolName: name, toolDescription: description });
+}
+
 /**
  * Local, offline decision for one MCP tool call.
  * - Hard-block only when the matched MCP pin is marked malicious.

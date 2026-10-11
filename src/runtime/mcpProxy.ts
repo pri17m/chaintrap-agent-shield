@@ -2,7 +2,7 @@ import { createInterface } from "node:readline";
 import { spawn, type ChildProcess } from "node:child_process";
 import { readFileSync } from "node:fs";
 
-import { evaluateMcpToolCall, type GuardResult, type McpToolCallPayload } from "./mcpToolGuard";
+import { evaluateMcpToolCall, scanToolDefinition, type GuardResult, type McpToolCallPayload } from "./mcpToolGuard";
 import type { Finding } from "../types";
 
 export interface ProxyOptions {
@@ -60,6 +60,66 @@ export function payloadFromRpc(msg: Record<string, unknown>, opts: Pick<ProxyOpt
   };
 }
 
+/** Tools whose definitions (from tools/list responses) matched a heuristic: tool name -> heuristic label. */
+export type FlaggedTools = Map<string, string>;
+
+/**
+ * Inspect one line from the child's stdout. If it is a tools/list result, scan each tool's
+ * name and description and record flagged tools. Never throws; unparsable lines are ignored.
+ * Returns newly flagged tools as [name, label] pairs.
+ */
+export function inspectServerLine(line: string, flagged: FlaggedTools): Array<[string, string]> {
+  const out: Array<[string, string]> = [];
+  try {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed[0] !== "{" && trimmed[0] !== "[") {
+      return out;
+    }
+    const parsed = JSON.parse(trimmed) as unknown;
+    const msgs = Array.isArray(parsed) ? parsed : [parsed];
+    for (const m of msgs) {
+      if (!isObject(m) || !isObject(m.result) || !Array.isArray(m.result.tools)) {
+        continue;
+      }
+      for (const t of m.result.tools) {
+        if (!isObject(t) || typeof t.name !== "string") {
+          continue;
+        }
+        const desc = typeof t.description === "string" ? t.description : undefined;
+        const hit = scanToolDefinition(t.name, desc);
+        if (hit && flagged.get(t.name) !== hit.label) {
+          flagged.set(t.name, hit.label);
+          out.push([t.name, hit.label]);
+        }
+      }
+    }
+  } catch {
+    /* fail open */
+  }
+  return out;
+}
+
+/** Upgrade an allow to warn when the called tool was flagged in an earlier tools/list. Block stays block. */
+function applyFlagged(result: GuardResult, toolName: unknown, flagged: FlaggedTools | undefined): GuardResult {
+  if (result.decision !== "allow" || typeof toolName !== "string") {
+    return result;
+  }
+  const label = flagged?.get(toolName);
+  if (!label) {
+    return result;
+  }
+  return {
+    decision: "warn",
+    reason: `Tool "${toolName}" was flagged in tools/list (${label}).`,
+    heuristic: label,
+    matchedFindingId: result.matchedFindingId,
+  };
+}
+
+function toolNameOf(msg: Record<string, unknown>): unknown {
+  return isObject(msg.params) ? msg.params.name : undefined;
+}
+
 function blockResponse(id: unknown, reason: string): Record<string, unknown> {
   return { jsonrpc: "2.0", id: id ?? null, error: { code: -32000, message: `Chaintrap blocked MCP tool call: ${reason}` } };
 }
@@ -78,6 +138,7 @@ export function evaluateClientLine(
   line: string,
   findings: Finding[],
   opts: Pick<ProxyOptions, "serverId" | "packageName">,
+  flagged?: FlaggedTools,
 ): ClientLineDecision {
   const trimmed = line.trim();
   if (!trimmed) {
@@ -99,7 +160,7 @@ export function evaluateClientLine(
       if (!isObject(el) || el.method !== "tools/call") {
         continue;
       }
-      const r = evaluateMcpToolCall(findings, payloadFromRpc(el, opts));
+      const r = applyFlagged(evaluateMcpToolCall(findings, payloadFromRpc(el, opts)), toolNameOf(el), flagged);
       results.push(r);
       if (r.decision === "block" && !blocked) {
         blocked = r;
@@ -128,7 +189,7 @@ export function evaluateClientLine(
     return { forward: true };
   }
   const msg = parsed;
-  const result = evaluateMcpToolCall(findings, payloadFromRpc(msg, opts));
+  const result = applyFlagged(evaluateMcpToolCall(findings, payloadFromRpc(msg, opts)), toolNameOf(msg), flagged);
   if (result.decision !== "block") {
     return { forward: true, result, results: [result] };
   }
@@ -150,9 +211,10 @@ export function startStdioProxy(options: ProxyOptions): ProxyHandle {
     stdio: ["pipe", "pipe", "inherit"],
   });
 
+  const flaggedTools: FlaggedTools = new Map();
   const rl = createInterface({ input: process.stdin });
   rl.on("line", (line) => {
-    const decided = evaluateClientLine(line, findings, options);
+    const decided = evaluateClientLine(line, findings, options, flaggedTools);
     const log = options.logWarnings !== false;
     if (!decided.forward) {
       // A blocked batch made of notifications only has nothing to answer, but is still never forwarded.
@@ -186,6 +248,15 @@ export function startStdioProxy(options: ProxyOptions): ProxyHandle {
     process.exit(code ?? 0);
   });
 
+  // Forward child output untouched; separately line-buffer a copy to inspect tools/list responses.
+  const childLines = createInterface({ input: child.stdout });
+  childLines.on("line", (line) => {
+    for (const [name, label] of inspectServerLine(line, flaggedTools)) {
+      if (options.logWarnings !== false) {
+        process.stderr.write(`[chaintrap-proxy] warn tools/list: tool "${name}" description/name matched heuristic "${label}"\n`);
+      }
+    }
+  });
   child.stdout.on("data", (d: Buffer) => {
     process.stdout.write(d);
   });
@@ -200,7 +271,7 @@ export function startStdioProxy(options: ProxyOptions): ProxyHandle {
   return {
     child,
     onClientLine(line: string) {
-      return evaluateClientLine(line, findings, options);
+      return evaluateClientLine(line, findings, options, flaggedTools);
     },
     close,
   };
